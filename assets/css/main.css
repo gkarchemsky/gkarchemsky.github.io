@@ -585,11 +585,16 @@ hr {
 @media print { .site-footer .wrap { border-top: 0; margin-top: 0; padding-top: 0; } }
 .site-footer a { color: var(--text-muted); }
 
-/* The full logo row lives here, so let it wrap and breathe. */
+/* The full logo row lives here, so give it the widest of the three gaps. It
+   is a single centred line at every width; see the .socials rule for how. */
+/* align-self, because .site-footer .wrap is a centred column and its children
+   are therefore sized to their content. An indefinite width is one the gap
+   percentage below resolves to zero against, which crushes the row into one
+   solid block of icons. Stretching gives it the real column width to divide. */
+.footer-socials { align-self: stretch; }
 .footer-socials .socials {
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 1.5rem 1.6rem;
+  --gap: 1.6rem;
 }
 .footer-socials .socials a { color: var(--text-muted); }
 .footer-socials .socials a:hover { color: var(--accent); }
@@ -608,14 +613,39 @@ hr {
 .socials {
   display: flex;
   align-items: center;
-  gap: 1.1rem;
+  flex-wrap: nowrap;
   list-style: none;
   margin: 0;
   padding: 0;
+
+  --icon: 21px;
+  --gap: 1.1rem;
+
+  /* The row never breaks onto a second line. It gives every icon its full
+     size first and spends whatever is left on the gaps, so a narrow phone
+     closes the icons up instead of dropping the last one underneath.
+
+     --n (how many icons) and --n1 (n - 1, the number of gaps) come from
+     social.html, which counts the icons it emitted. The fallbacks make the
+     subtraction land far below --gap if the row ever renders without them,
+     so min() picks the design gap and nothing looks broken.
+
+     The outer max() is the floor. Past the point where even the whole row of
+     gaps has been spent the icons would start touching, so below that the
+     0.5rem holds and the icons give way instead — which is also what happens
+     if several more networks are switched on in _config.yml. */
+  column-gap: var(--gap);
+  column-gap: max(0.5rem, min(var(--gap), calc((100% - var(--n, 1) * var(--icon)) / var(--n1, 1))));
 }
+/* Narrower than a zero gap can absorb, flex shrink takes over. Nothing
+   shrinks without min-width: 0 on both the item and the link, and the icon
+   needs height: auto to scale square — pinned at 21px tall while its width
+   is squeezed, every logo comes out horizontally compressed. */
+.socials li { min-width: 0; }
 .socials a {
   color: var(--text-muted);
   display: inline-flex;
+  min-width: 0;
   line-height: 0;
   transition: color 0.15s ease, transform 0.15s ease;
 }
@@ -624,10 +654,15 @@ hr {
   transform: translateY(-2px);
   text-decoration: none;
 }
-.socials svg { width: 21px; height: 21px; fill: currentColor; display: block; }
+.socials svg {
+  width: var(--icon);
+  max-width: 100%;
+  height: auto;
+  fill: currentColor;
+  display: block;
+}
 
-.socials--lg { gap: 1.35rem; }
-.socials--lg svg { width: 25px; height: 25px; }
+.socials--lg { --icon: 25px; --gap: 1.35rem; }
 
 /* --------------------------------------------------------------------------
    Home — identity block
