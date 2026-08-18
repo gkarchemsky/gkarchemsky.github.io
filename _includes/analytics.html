@@ -1,0 +1,40 @@
+{%- comment -%}
+  Analytics, off unless configured in _config.yml.
+
+  Two deliberate constraints:
+
+  * Nothing loads in development. Local page views are not data, and a beacon
+    firing on every `jekyll serve` reload would poison the numbers.
+  * No cookies, no cross-site identifiers. Both providers below measure page
+    views without tracking people, so the site needs no consent banner —
+    which matters when the audience reads page source for a living.
+
+  Set `analytics.provider` to "cloudflare" or "goatcounter" and fill in the
+  token. Blank provider renders nothing at all.
+{%- endcomment -%}
+
+{%- if jekyll.environment == "production" and site.analytics.provider and site.analytics.token and site.analytics.token != "" -%}
+
+  {%- case site.analytics.provider -%}
+
+  {%- when "cloudflare" -%}
+    {%- comment -%}
+      Cloudflare Web Analytics. The token comes from the dashboard under
+      Analytics & Logs -> Web Analytics -> Add a site. The manual beacon is
+      required here because the DNS records are unproxied, so Cloudflare has
+      no opportunity to inject it server-side.
+    {%- endcomment -%}
+    <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon='{"token": "{{ site.analytics.token }}"}'></script>
+
+  {%- when "goatcounter" -%}
+    {%- comment -%}
+      GoatCounter. `token` is the subdomain, e.g. "gkarchemsky" for
+      gkarchemsky.goatcounter.com.
+    {%- endcomment -%}
+    <script data-goatcounter="https://{{ site.analytics.token }}.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
+
+  {%- endcase -%}
+
+{%- endif -%}

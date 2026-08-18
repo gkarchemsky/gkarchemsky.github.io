@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="gkarchemsky">
+  <style>
+    rect.bg { fill: #0b0d10; }
+    path, rect.cursor { fill: none; stroke: #3cd3fe; }
+    @media (prefers-color-scheme: light) {
+      rect.bg { fill: #ffffff; }
+      path, rect.cursor { stroke: #007eae; }
+    }
+  </style>
+  <rect class="bg" width="64" height="64" rx="13"/>
+  <path d="M16 21 L29 32 L16 43" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect class="cursor" x="36" y="40" width="14" height="6" rx="1" stroke-width="6"/>
+</svg>

@@ -1,0 +1,277 @@
+# ---------------------------------------------------------------------------
+# Site identity
+# ---------------------------------------------------------------------------
+# The blog's name, which is what the browser tab carries: the home tab reads
+# "gkarchemsky's blog" and every other page "Blog | gkarchemsky's blog".
+# author.name below stays the full name — it signs the footer, the JSON-LD
+# author and the feed's entries, which are the person rather than the site.
+title: "gkarchemsky's blog"
+# No `tagline:` on purpose. jekyll-seo-tag renders the home page's <title> as
+# "title | tagline" when one is set, and only there — every other page is
+# already "page title | site title". Without it the home page is simply
+# "George Karchemsky", which is also what it says on the page.
+description: >-
+  Reverse engineering, vulnerability research and exploit development.
+url: "https://gkarchemsky.com"
+baseurl: ""
+lang: en
+
+author:
+  name: George Karchemsky
+  handle: gkarchemsky
+  location: Israel
+  twitter: gkarchemsky        # renders as twitter:creator on every page
+
+# Read by jekyll-seo-tag only, and separate from the `social:` block below:
+# this is what puts "@gkarchemsky" on the card when someone shares a link.
+twitter:
+  username: gkarchemsky
+
+# ---------------------------------------------------------------------------
+# Social links. Leave a value empty ("") to hide that icon from the site.
+# These render as logos on the home page and in the site header.
+# ---------------------------------------------------------------------------
+social:
+  # --- active -------------------------------------------------------------
+  github: gkarchemsky          # github.com/<value>
+  twitter: gkarchemsky         # x.com/<value>
+  linkedin: gkarchemsky        # linkedin.com/in/<value>
+  ctftime: 140264              # ctftime.org/user/<value>
+  email: ""                    # leave blank: falls back to contact.email
+  rss: true                    # show an RSS icon in the social rows
+
+  # Full URLs, not handles — these two are instance-hosted, so there is no
+  # single domain to hardcode in social.html the way there is for GitHub.
+  #
+  # Both carry rel="me". On Mastodon that is half of a verification handshake:
+  # put a link back to this site in the profile's metadata fields and Mastodon
+  # marks it green, which is the only real proof that the account and the blog
+  # are the same person. The link here is the half this repo controls.
+  mastodon: https://mastodon.social/@gkarchemsky
+  bluesky: https://bsky.app/profile/gkarchemsky.bsky.social
+
+  # --- verified to exist under this handle, off until you want them -------
+  # Each was confirmed against a control (a bogus username on the same site),
+  # and the ones marked ✔name returned "George Karchemsky" in page metadata.
+  medium: ""                   # gkarchemsky — account exists but has 0 posts
+  reddit: ""                   # gkarchemsky
+  telegram: ""                 # gkarchemsky                                        ✔name
+  youtube: ""                  # gkarchemsky                                        ✔name
+  gitlab: ""                   # gkarchemsky                                        ✔name
+  docker: ""                   # gkarchemsky                                        ✔name
+  twitch: ""                   # gkarchemsky
+  steam: ""                    # gkarchemsky
+
+# ---------------------------------------------------------------------------
+# Contact + PGP.
+#
+# The contact block and key link render only when these are set.
+#
+# To generate a key and publish it:
+#   gpg --full-generate-key                       # ed25519 or rsa4096
+#   gpg --fingerprint <your-address>              # copy the 40-hex fingerprint
+#   gpg --armor --export <fingerprint> > pgp.txt  # overwrite the placeholder
+# ---------------------------------------------------------------------------
+contact:
+  email: "gkarchemsky@gmail.com"
+  pgp_fingerprint: "EC28737C65561D2CF1C4DDB969104F780B3C2BF9"
+  pgp_key: /pgp.txt          # where the armoured public key is served
+
+# ---------------------------------------------------------------------------
+# Comments (giscus — comments stored as GitHub Discussions).
+#
+# Nothing renders until repo_id AND category_id are filled in, so this is safe
+# to leave as-is. A single post can opt out with `comments: false`.
+#
+# To switch it on:
+#   1. Create a repo for the discussions — a separate one is recommended, so
+#      visitor threads do not land in the research archive. `blog-comments` is
+#      the usual name. It must be public.
+#   2. Enable Discussions on it: Settings -> General -> Features -> Discussions.
+#   3. Install the giscus app on that repo only: https://github.com/apps/giscus
+#   4. Open https://giscus.app, enter the repo, and copy the two IDs it prints.
+#      (repo_id for gkarchemsky/gkarchemsky.github.io is R_kgDOTyaB_Q, if you
+#      decide to host the discussions on the site repo itself instead.)
+#
+# `mapping: pathname` ties a thread to the post's URL — renaming a post starts a
+# new thread, so treat published URLs as permanent.
+# ---------------------------------------------------------------------------
+comments:
+  repo: "gkarchemsky/blog-comments"
+  repo_id: "R_kgDOT4xmjA"
+  category: "Announcements"  # only maintainers can open threads in this one,
+  category_id: "DIC_kwDOT4xmjM4DDZab"   # so nobody can create noise threads
+  mapping: pathname
+  reactions: 1
+
+# ---------------------------------------------------------------------------
+# Analytics. Renders nothing until `token` is set, and never loads outside a
+# production build, so local page views cannot pollute the numbers.
+#
+# provider: "cloudflare"  — dash.cloudflare.com -> Analytics & Logs ->
+#                           Web Analytics -> Add a site -> copy the token out
+#                           of the snippet it prints. Cookie-free.
+# provider: "goatcounter" — token is the subdomain, e.g. "gkarchemsky" for
+#                           gkarchemsky.goatcounter.com.
+#
+# Both are cookieless and store no cross-site identifiers, so neither needs a
+# consent banner. Leave provider blank for no analytics at all.
+# ---------------------------------------------------------------------------
+analytics:
+  provider: "cloudflare"
+  token: "d0d63cf8e11f4cb9afd5e5dab10da07f"
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+# Every human-readable date on the site comes from here, so the format is
+# changed in one place. Ruby strftime: %-d drops the leading zero, so it reads
+# "January 5, 2020" rather than "January 05, 2020".
+#
+# Machine-readable dates are unaffected — datetime="" attributes, the Atom
+# feed, the sitemap and the advisories table's sort key all stay ISO 8601,
+# which is also what keeps the Disclosed column sorting chronologically.
+date_format: "%B %-d, %Y"
+
+markdown: kramdown
+highlighter: rouge
+permalink: /posts/:title/
+timezone: Asia/Jerusalem
+excerpt_separator: "<!--more-->"
+
+kramdown:
+  input: GFM
+  hard_wrap: false
+  auto_ids: true
+  footnote_backlink: "&#8617;"
+  # Leave $$…$$ alone. kramdown's own math engine emits MathJax-flavoured
+  # <script type="math/tex"> tags; passing the delimiters through untouched
+  # lets KaTeX render them here *and* lets github.com render the same source,
+  # since GitHub understands $…$ and $$…$$ natively.
+  math_engine: null
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    block:
+      line_numbers: false
+
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+feed:
+  path: /feed.xml
+  # jekyll-feed generates one extra feed per category listed here, at
+  # /feed/<category>.xml. /feed.xml stays the canonical, everything feed —
+  # it is the one in <head> that readers and crawlers autodiscover.
+  categories:
+    - ctf
+
+# NOT in effect, and kept only so nobody re-adds it expecting results.
+# jekyll-sass-converter compiles .scss/.sass; assets/css/main.css is plain CSS
+# and is copied through byte-for-byte (verified: served bytes == source bytes).
+# Renaming main.css to main.scss would make this real and strip ~47KB of
+# comments from what readers download — considered and deliberately not done,
+# because the comments are the maintenance record and gzip already carries
+# most of the cost.
+sass:
+  style: compressed
+
+# Local `jekyll serve` only — GitHub Pages ignores this key.
+#
+# Jekyll's own servlet already sends `Cache-Control: private, max-age=0,
+# no-store, no-cache, must-revalidate` (servlet.rb), so the earlier claim here
+# — that without this block there is no Cache-Control at all — was wrong. What
+# this actually adds is `Pragma: no-cache` for older intermediaries. Harmless,
+# and cheap insurance against a stale stylesheet after a rebuild.
+webrick:
+  headers:
+    Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+    Pragma: no-cache
+
+defaults:
+  # ---------------------------------------------------------------------
+  # Link previews. `og:image` is a per-URL tag, so every page needs one;
+  # this sets the house card as the default for all of them. A post that
+  # deserves its own overrides it in front matter:
+  #
+  #   image:
+  #     path: /assets/img/og/<slug>.png
+  #     width: 1200
+  #     height: 630
+  #     alt: "<post title>"
+  #
+  # ---------------------------------------------------------------------
+  - scope:
+      path: ""
+    values:
+      image:
+        path: /assets/img/og-default.png
+        width: 1200
+        height: 630
+        alt: "George Karchemsky — reverse engineering and exploit development"
+
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+      toc: true
+  - scope:
+      path: ""
+      type: pages
+    values:
+      layout: page
+
+# ---------------------------------------------------------------------------
+# GitHub Pages bundles plugins this site never lists: jekyll-optional-front-
+# matter, jekyll-readme-index, jekyll-titles-from-headings and jekyll-default-
+# layout. They load from the github-pages gem itself, so leaving them out of
+# `plugins:` above does nothing — between them they turn *every* README.md in
+# the repo into a published, sitemap-indexed page with a title lifted from its
+# first heading.
+#
+# The setting below is not what stops that, and an earlier version of this
+# comment wrongly claimed it was. readme_index only decides which READMEs get
+# promoted to *directory indexes*; with_frontmatter: true is still wanted,
+# because it is what makes research/<cve>/README.md the landing page for its
+# folder while leaving front-matter-less READMEs alone. But publishing is
+# jekyll-optional-front-matter's doing, and the only reliable way to stop it is
+# to keep the file out of the build — see `exclude:` below. /assets/ and
+# /assets/img/ were both live, indexed URLs serving internal notes until then.
+# Jekyll ignores directories beginning with an underscore unless they are one
+# of its own, so the page sources in _pages/ have to be listed here or they are
+# simply not built. They stay ordinary pages — still in `site.pages`, which is
+# what the nav gating and the research index look them up through — and each
+# one pins its own `permalink:`, so where the file sits on disk has no bearing
+# on its URL.
+include:
+  - _pages
+
+readme_index:
+  with_frontmatter: true
+
+# GitHub Pages defaults to the Primer theme when none is set, and ships its
+# 75KB stylesheet on every deploy even though nothing links it. This site has
+# its own CSS.
+theme: null
+
+exclude:
+  - tools
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - notes
+  - LICENSE*         # glob, so a future LICENSE-CODE does not leak
+  - node_modules
+
+  # Every internal README, one line each. A bare `README.md` matches only the
+  # file at the repo root — exclude patterns are matched against the path, not
+  # the basename — which is why these three were published despite it being
+  - README.md                    # repo root
+  - assets/vendor/README.md      # why each library is vendored, and its version
+  - assets/img/cats/README.md    # how the 404 page picks a photo
+  - research/README.md           # how to lay out an artifacts folder
+
+# research/ is deliberately NOT excluded: PoCs and artifacts are copied through
+# so posts can link directly to them at gkarchemsky.com/research/<slug>/...

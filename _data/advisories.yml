@@ -1,0 +1,94 @@
+# ---------------------------------------------------------------------------
+# CVE / advisory index, newest first.
+#
+# Each entry keeps its sources separate and quoted, never merged or
+# paraphrased. `apple:` reproduces the vendor advisory entry 1:1; `zdi:`
+# carries the reporting program's own text alongside it. Where the two
+# disagree, the page shows both and lets the reader judge.
+#
+#   cve            CVE id
+#   vendor         affected vendor
+#   product        affected component
+#   date           vendor fix shipped, YYYY-MM-DD
+#   post           site path to the write-up. The link renders only once that
+#                  post actually exists, so it can be set ahead of publishing.
+#
+#   apple:
+#     component      heading Apple files it under
+#     available_for  Apple's "Available for:" line, verbatim
+#     impact         Apple's "Impact:" line, verbatim
+#     description    Apple's "Description:" line, verbatim
+#     credit         Apple's credit line, verbatim
+#     fixed_in       the release this page cites (see `url`)
+#     url            vendor advisory
+#
+#   zdi:
+#     id, url, cvss, cvss_vector
+#     details        ZDI's "Vulnerability Details" text, verbatim
+#     reported       date reported to the program
+#     published      date the ZDI advisory went public
+# ---------------------------------------------------------------------------
+
+- cve: CVE-2026-20675
+  post: /posts/cve-2026-20675/
+  vendor: Apple
+  product: ImageIO
+  date: 2026-02-11
+
+  apple:
+    component: ImageIO
+    available_for: macOS Tahoe
+    impact: Processing a maliciously crafted image may lead to disclosure of user information
+    description: The issue was addressed with improved bounds checks.
+    credit: George Karchemsky (@gkarchemsky) working with Trend Micro Zero Day Initiative
+    fixed_in: macOS Tahoe 26.3
+    url: https://support.apple.com/en-us/126348
+
+  zdi:
+    id: ZDI-26-174
+    url: https://www.zerodayinitiative.com/advisories/ZDI-26-174/
+    cvss: 7.8
+    cvss_vector: AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+    details: >-
+      This vulnerability allows remote attackers to execute arbitrary code on
+      affected installations of Apple macOS. Interaction with the ImageIO
+      library is required to exploit this vulnerability but attack vectors may
+      vary depending on the implementation. The specific flaw exists within the
+      ImageIO framework. The issue results from the lack of proper validation
+      of user-supplied data, which can result in an integer overflow before
+      writing to memory. An attacker can leverage this vulnerability to execute
+      code in the context of the current process.
+    reported: 2025-12-05
+    published: 2026-03-10
+
+- cve: CVE-2026-20634
+  post: /posts/cve-2026-20634/
+  vendor: Apple
+  product: ImageIO
+  date: 2026-02-11
+
+  apple:
+    component: ImageIO
+    available_for: macOS Tahoe
+    impact: Processing a maliciously crafted image may result in disclosure of process memory
+    description: The issue was addressed with improved memory handling.
+    credit: George Karchemsky (@gkarchemsky) working with Trend Micro Zero Day Initiative
+    fixed_in: macOS Tahoe 26.3
+    url: https://support.apple.com/en-us/126348
+
+  zdi:
+    id: ZDI-26-175
+    url: https://www.zerodayinitiative.com/advisories/ZDI-26-175/
+    cvss: 3.3
+    cvss_vector: AV:L/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N
+    details: >-
+      This vulnerability allows remote attackers to disclose sensitive
+      information on affected installations of Apple macOS. Interaction with
+      the ImageIO framework is required to exploit this vulnerability but
+      attack vectors may vary depending on the implementation. The specific
+      flaw exists within the ImageIO framework. Crafted data in a SGI image can
+      trigger a read past the end of an allocated buffer. An attacker can
+      leverage this in conjunction with other vulnerabilities to execute
+      arbitrary code in the context of the current process.
+    reported: 2025-11-05
+    published: 2026-03-10

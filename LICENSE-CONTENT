@@ -1,0 +1,29 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Applies to the written content of this site: the posts under _posts/ and
+_drafts/, the page copy in about.md and the other pages, and the figures and
+diagrams under assets/img/ that were drawn for those posts.
+
+Code is MIT instead — see LICENSE.
+
+  Full legal text:  https://creativecommons.org/licenses/by/4.0/legalcode
+  Plain summary:    https://creativecommons.org/licenses/by/4.0/
+
+You are free to share and adapt this material, including commercially, so long
+as you give appropriate credit, link to the licence, and say whether you made
+changes.
+
+Suggested attribution:
+
+  "<Title of the post>" by George Karchemsky, licensed CC BY 4.0.
+  https://gkarchemsky.com/posts/<slug>/
+
+Two things this licence does not cover:
+
+  - Screenshots and excerpts of third-party software (Apple's disassembly,
+    a vendor advisory, a tool's interface). Those belong to their owners and
+    appear here under fair use for commentary; the licence above cannot and
+    does not relicense them.
+
+  - CVE identifiers, advisory text quoted from Apple or the Zero Day
+    Initiative, and other people's words quoted in a post.

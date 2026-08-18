@@ -1,0 +1,36 @@
+---
+layout: default
+---
+<div class="wrap">
+  {%- comment -%}
+    `head_rule: false` in front matter drops the line under the heading. Worth
+    having as a switch rather than a one-off override: a page whose first
+    element is already a heading or a rule of its own does not need a second.
+  {%- endcomment -%}
+  {%- comment -%}
+    `page_head: false` for a page whose body already opens with its own <h1>.
+    The research landing pages are READMEs that have to read correctly in the
+    repo as well as here, so they keep their Markdown heading — and with this
+    header also rendering one, those pages shipped the title twice, as two
+    <h1> elements in the same document.
+  {%- endcomment -%}
+  {%- if page.page_head != false %}
+  <header class="page-head{% if page.head_rule == false %} no-rule{% endif %}">
+    <h1>{{ page.title }}</h1>
+    {%- comment -%}
+      `lede:`, not `description:` — deliberately the opposite of a post.
+
+      On a post the two are the same sentence, so one field drives both. A
+      section page's visible intro and its search-result text are different
+      by design: /tags/ shows "Every post, filterable by topic." and tells
+      Google "Posts grouped by topic — kernel, sandbox, exploitation".
+      Reading `description` here would print the SEO line on the page.
+    {%- endcomment -%}
+    {%- if page.lede %}<p class="lede">{{ page.lede }}</p>{%- endif %}
+  </header>
+  {%- endif %}
+
+  <div class="prose">
+    {{ content }}
+  </div>
+</div>

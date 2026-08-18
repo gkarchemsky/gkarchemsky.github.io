@@ -1,1 +1,0 @@
-# gkarchemsky.github.io

@@ -1,0 +1,55 @@
+{%- comment -%}
+Contact block: the standing line first, then address / PGP key / fingerprint
+underneath it.
+
+Email and PGP are independent — set either or both in _config.yml -> contact:.
+Nothing renders for a value that is blank, so the page is never left with a
+dead mailto or a link to an unreplaced placeholder key.
+{%- endcomment -%}
+{%- assign c = site.contact -%}
+{%- assign fpr = c.pgp_fingerprint | remove: " " | upcase -%}
+{%- assign has_email = false -%}
+{%- if c.email and c.email != "" %}{% assign has_email = true %}{% endif -%}
+{%- assign has_pgp = false -%}
+{%- if fpr != "" %}{% assign has_pgp = true %}{% endif -%}
+
+<p>The links in the header and footer are the fastest way to reach me.</p>
+
+{%- if has_email or has_pgp %}
+<dl class="contact">
+  {%- if has_email %}
+  <dt>Email</dt>
+  <dd><a href="mailto:{{ c.email }}">{{ c.email }}</a></dd>
+  {%- endif %}
+
+  {%- if has_pgp %}
+  <dt>PGP key</dt>
+  <dd><a href="{{ c.pgp_key | relative_url }}">{{ c.pgp_key }}</a></dd>
+
+  <dt>Fingerprint</dt>
+  <dd>
+    {%- comment -%}
+      Grouped in fours, driven by the actual length rather than a fixed ten
+      groups: a v4 fingerprint is 40 hex chars, but a v6 key (RFC 9580) is 64,
+      and hardcoding 40 would silently truncate it.
+
+      The groups are accumulated into a string rather than emitted inline: a
+      separator printed inside the loop sits next to whitespace-stripping tags
+      and gets eaten before it reaches the output.
+    {%- endcomment -%}
+    {%- assign groups = fpr | size | divided_by: 4 -%}
+    {%- assign grouped = "" -%}
+    {%- for g in (1..groups) -%}
+      {%- assign start = forloop.index0 | times: 4 -%}
+      {%- assign chunk = fpr | slice: start, 4 -%}
+      {%- if forloop.first -%}
+        {%- assign grouped = chunk -%}
+      {%- else -%}
+        {%- assign grouped = grouped | append: " " | append: chunk -%}
+      {%- endif -%}
+    {%- endfor -%}
+    <code class="fpr">{{ grouped }}</code>
+  </dd>
+  {%- endif %}
+</dl>
+{%- endif %}

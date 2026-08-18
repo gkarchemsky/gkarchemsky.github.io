@@ -1,0 +1,99 @@
+
+{%- assign max = include.limit | default: 3 -%}
+{%- assign scored = "" | split: "" -%}
+
+{%- comment -%}
+  Same stream only: a CTF write-up suggests write-ups, a research post suggests
+  research posts. The two are separated everywhere else on the site — /blog/
+  excludes CTF, /ctf/ has its own list, archive and feed — and recommending
+  across the divide sent a reader who came for kernel exploitation to a weekend
+  challenge, on the strength of a shared "pwn" tag.
+{%- endcomment -%}
+{%- assign page_is_ctf = false -%}
+{%- if page.categories contains 'ctf' %}{% assign page_is_ctf = true %}{% endif -%}
+
+{%- for candidate in site.posts -%}
+  {%- assign skip = false -%}
+  {%- if candidate.url == page.url -%}{%- assign skip = true -%}{%- endif -%}
+  {%- comment -%} The series banner covers these — see above. {%- endcomment -%}
+  {%- if page.series and candidate.series == page.series -%}{%- assign skip = true -%}{%- endif -%}
+  {%- assign cand_is_ctf = false -%}
+  {%- if candidate.categories contains 'ctf' %}{% assign cand_is_ctf = true %}{% endif -%}
+  {%- if cand_is_ctf != page_is_ctf -%}{%- assign skip = true -%}{%- endif -%}
+
+  {%- unless skip -%}
+    {%- assign shared = 0 -%}
+    {%- for t in page.tags -%}
+      {%- if candidate.tags contains t -%}{%- assign shared = shared | plus: 1 -%}{%- endif -%}
+    {%- endfor -%}
+
+    {%- if shared > 0 -%}
+      {%- comment -%}
+        Pack score and date into a sortable string — Liquid cannot sort by a
+        computed key, and this avoids a second pass over the list.
+      {%- endcomment -%}
+      {%- assign key = shared | prepend: "000" | slice: -3, 3 -%}
+      {%- comment -%}
+        Fixed width, for the reason spelled out below: Liquid sorts these rows
+        as strings. `%s` is an epoch integer and happens to be 10 digits for
+        every plausible post date, but this is the array whose sort decides
+        *which* posts appear, so it is the last place to rely on that.
+      {%- endcomment -%}
+      {%- assign stamp = candidate.date | date: "%Y%m%d%H%M%S" -%}
+      {%- assign row = key | append: "|" | append: stamp | append: "|" | append: candidate.url -%}
+      {%- assign scored = scored | push: row -%}
+    {%- endif -%}
+  {%- endunless -%}
+{%- endfor -%}
+
+{%- if scored.size > 0 -%}
+{%- assign ranked = scored | sort | reverse -%}
+
+{%- assign chosen = "" | split: "" -%}
+{%- for row in ranked limit: max -%}
+  {%- assign parts = row | split: "|" -%}
+  {%- assign url = parts | last -%}
+  {%- assign post = site.posts | where: "url", url | first -%}
+  {%- if post -%}
+    {%- assign when = post.date | date: "%Y%m%d%H%M%S" -%}
+    {%- assign entry = when | append: "|" | append: parts[0] | append: "|" | append: url -%}
+    {%- assign chosen = chosen | push: entry -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- assign chosen = chosen | sort | reverse -%}
+
+<nav class="related" aria-labelledby="related-h">
+  {%- comment -%}
+    Named for the stream, matching the pager below it.
+  {%- endcomment -%}
+  <p class="related-title" id="related-h">
+    {%- if page_is_ctf %}Related write-ups{% else %}Related posts{% endif -%}
+  </p>
+  <ul>
+    {%- for row in chosen -%}
+      {%- assign parts = row | split: "|" -%}
+      {%- assign score = parts[1] | plus: 0 -%}
+      {%- assign url = parts | last -%}
+      {%- assign post = site.posts | where: "url", url | first -%}
+      {%- if post %}
+      <li>
+        <a href="{{ post.url | relative_url }}">
+          <span class="related-why">
+            {%- if score == 1 -%}
+              1 shared tag
+            {%- else -%}
+              {{ score }} shared tags
+            {%- endif -%}
+          </span>
+          <span class="related-name">{{ post.title }}</span>
+          <span class="related-meta">
+            <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: site.date_format }}</time>
+            &middot; {% include read-time.html post=post %} min
+          </span>
+        </a>
+      </li>
+      {%- endif -%}
+    {%- endfor -%}
+  </ul>
+</nav>
+{%- endif -%}

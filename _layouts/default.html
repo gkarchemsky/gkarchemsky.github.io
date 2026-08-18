@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d10" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+
+  {%- comment -%}
+    Tells the browser the page is designed for both schemes, so it renders form
+    controls, scrollbars and the pre-paint canvas in the right one. Without it a
+    dark page still gets a white scrollbar and a white flash on load.
+  {%- endcomment -%}
+  <meta name="color-scheme" content="dark light">
+
+  {%- comment -%}
+    Send the full URL to same-origin, only the origin cross-origin. So an
+    outbound link to a vendor advisory does not leak which post it came from.
+    The default leaks the full path.
+  {%- endcomment -%}
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  {%- comment -%}
+    max-image-preview:large opts the OG card into full-size previews in Google
+    results rather than a thumbnail. `index, follow` is the default but stating
+    it stops a stray plugin or CDN default from overriding it.
+  {%- endcomment -%}
+  {%- comment -%}
+    Anything kept out of the sitemap is kept out of the index too. /404.html is
+    a real, directly-fetchable URL on GitHub Pages, and it was serving
+    "index, follow" — an error page competing with the pages it exists to
+    apologise for.
+  {%- endcomment -%}
+  {%- if page.sitemap == false -%}
+  <meta name="robots" content="noindex, follow">
+  {%- else -%}
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  {%- endif -%}
+
+  {%- comment -%} Apply the saved theme before first paint to avoid a flash. {%- endcomment -%}
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  {%- comment -%}
+    `?v=` is the build timestamp, so a rebuild always produces a new asset URL.
+    Needed because `jekyll serve --livereload` skips its own no-cache headers
+    for non-HTML files, which otherwise leaves stale CSS in the browser. It
+    doubles as ordinary cache-busting on the deployed site.
+  {%- endcomment -%}
+  {%- assign v = site.time | date: '%s' -%}
+
+  {%- comment -%}
+    `title=false` stops jekyll-seo-tag emitting its own <title>. Left to
+    itself it renders the home page as "title | tagline", and with no tagline
+    set it substitutes site.description — which is a sentence, not a title.
+    Removing the tagline therefore made the home title *longer*. The rule below
+    is the one actually wanted: the home page is just the name, everything else
+    is "page | name". seo-tag still supplies og:title, twitter:title and the
+    rest of the metadata.
+  {%- endcomment -%}
+  {%- seo title=false -%}
+  {%- if page.url == '/' -%}
+  <title>{{ site.title }}</title>
+  {%- elsif page.layout == 'post' -%}
+  {%- comment -%}
+    Posts carry no site name. A post title is already self-identifying, and
+    appending 17 more characters only pushes it past where Google truncates —
+    "A Reasonably Long Post Title That Runs On A While" is 61
+    characters on its own. Section pages keep it, because "Blog" or "Tags"
+    alone says nothing about whose blog it is.
+  {%- endcomment -%}
+  <title>{{ page.title }}</title>
+  {%- else -%}
+  <title>{{ page.title | default: site.title }} | {{ site.title }}</title>
+  {%- endif -%}
+  {%- comment -%}
+    No ?v= stamp on these: browsers keep favicons in a separate, aggressive
+    cache keyed by URL, and changing the URL each build makes them re-fetch
+    or drop the icon rather than refresh it. /favicon.ico is listed because
+    browsers request it at the root whether or not it is declared.
+  {%- endcomment -%}
+  {%- comment -%}
+    The SVG first: it carries its own `prefers-color-scheme` block, so one file
+    serves both themes. The .ico is the fallback for browsers that do not take
+    SVG favicons, and being a bitmap it cannot adapt.
+  {%- endcomment -%}
+  <link rel="icon" href="{{ '/assets/img/favicon.svg' | relative_url }}" type="image/svg+xml">
+  <link rel="icon" href="{{ '/favicon.ico' | relative_url }}" sizes="any">
+  <link rel="apple-touch-icon" href="{{ '/assets/img/apple-touch-icon.png' | relative_url }}">
+  {%- comment -%} Safari pinned tabs render a monochrome mask, not the favicon. {%- endcomment -%}
+  <link rel="mask-icon" href="{{ '/assets/img/favicon.svg' | relative_url }}" color="#3cd3fe">
+
+  <link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}?v={{ v }}">
+  {%- feed_meta -%}
+
+  {%- comment -%}
+    Guarded on that category actually having posts. jekyll-feed writes the file
+    whether or not the category is populated, so without this a reader pasting
+    /ctf/ into their feed reader was offered a subscription to nothing — which
+    is the state the production build is in today, with _posts/ empty.
+    `feed_category:` names the category to count; without it the link is
+    advertised as soon as the page sets `feed:`.
+  {%- endcomment -%}
+  {%- assign feed_ok = false -%}
+  {%- if page.feed -%}
+    {%- if page.feed_category -%}
+      {%- assign feed_posts = site.posts | where_exp: "p", "p.categories contains page.feed_category" -%}
+      {%- if feed_posts.size > 0 %}{% assign feed_ok = true %}{% endif -%}
+    {%- else -%}
+      {%- assign feed_ok = true -%}
+    {%- endif -%}
+  {%- endif -%}
+  {%- if feed_ok -%}
+  {%- comment -%}
+    absolute_url, matching what feed_meta emits: a feed reader handed this
+    document out of context — fetched by a bot, or pasted into a reader that
+    does not resolve against the page — has to be able to reach it.
+  {%- endcomment -%}
+  <link rel="alternate" type="application/atom+xml"
+        title="{{ site.title }} — {{ page.title }}"
+        href="{{ page.feed | absolute_url }}">
+  {%- endif -%}
+
+  {%- comment -%}
+    Lets a browser add this site as a search engine — type the domain in the
+    address bar, press Tab, and search the blog without loading a page first.
+    Rare, and worth having: a reader can search the site from the address bar.
+  {%- endcomment -%}
+  <link rel="search" type="application/opensearchdescription+xml"
+        href="{{ '/opensearch.xml' | relative_url }}" title="{{ site.title }}">
+
+  {%- comment -%}
+    Warm up the connections we will actually need, so the TLS handshake is not
+    on the critical path when the reader reaches the comments or a diagram.
+    Only origins this site genuinely uses — a preconnect to something unused is
+    a wasted round trip.
+  {%- endcomment -%}
+  {%- if site.comments.category_id and site.comments.category_id != "" %}
+  <link rel="preconnect" href="https://giscus.app" crossorigin>
+  {%- endif %}
+  {%- if page.math or page.asciinema %}
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  {%- endif %}
+
+  {%- comment -%}
+    Puts the author's name on the link preview when someone shares a post on
+    Mastodon — instances read this and render "by @gkarchemsky@mastodon.social"
+    under the card instead of a bare headline, and it makes the byline
+    clickable back to the account.
+
+    Derived from social.mastodon rather than configured separately, so there is
+    only one place the account is written down. The handle form the spec wants
+    is @user@host, which is the URL's last path segment (already carrying its
+    @) joined to the host.
+
+    Rarely set, and it costs a line.
+  {%- endcomment -%}
+  {%- if site.social.mastodon and site.social.mastodon != "" -%}
+    {%- assign masto_parts = site.social.mastodon | split: "/" -%}
+    {%- if masto_parts.size >= 4 -%}
+  <meta name="fediverse:creator" content="{{ masto_parts.last }}@{{ masto_parts[2] }}">
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if page.layout == 'post' -%}
+  {%- assign byline_meta = page.author | default: site.author.name -%}
+  {%- if byline_meta.first %}{% assign byline_meta = byline_meta | join: ", " %}{% endif -%}
+  <meta name="twitter:label1" content="Written by">
+  <meta name="twitter:data1" content="{{ byline_meta }}">
+  <meta name="twitter:label2" content="Reading time">
+  <meta name="twitter:data2" content="{% include read-time.html post=page %} min">
+  {%- endif -%}
+  {%- if jekyll.environment == "production" and site.analytics.provider and site.analytics.token and site.analytics.token != "" -%}
+    {%- case site.analytics.provider -%}
+      {%- when "cloudflare" %}
+  <link rel="dns-prefetch" href="https://static.cloudflareinsights.com">
+      {%- when "goatcounter" %}
+  <link rel="dns-prefetch" href="https://gc.zgo.at">
+      {%- when "plausible" %}
+  <link rel="dns-prefetch" href="https://plausible.io">
+    {%- endcase -%}
+  {%- endif %}
+
+  {%- comment -%}
+    Prerender the next page on hover. `moderate` fires after 200ms of pointer
+    hover, which is about the time between a reader deciding to click and
+    actually clicking — so the post is already rendered when they arrive.
+    Chrome and Edge honour it; everyone else ignores it harmlessly.
+  {%- endcomment -%}
+  <script type="speculationrules">
+  {
+    "prerender": [{
+      "where": { "and": [
+        { "href_matches": "/*" },
+        { "not": { "href_matches": "/assets/*" } },
+        { "not": { "href_matches": "/research/*" } }
+      ]},
+      "eagerness": "moderate"
+    }]
+  }
+  </script>
+
+  {%- comment -%}
+    Opt-in per page, and the `if` wraps the include rather than sitting inside
+    it. The partials for these features are not in the repository while nothing
+    uses them, and Jekyll aborts the whole build on an include it cannot find —
+    so the guard has to stop the include being reached at all, not just stop it
+    emitting. Restore the partial alongside the first page that sets the flag.
+  {%- endcomment -%}
+  {%- if page.math -%}{%- include math.html -%}{%- endif -%}
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  {%- include header.html -%}
+
+  <main id="main" class="page-content">
+    {{ content }}
+  </main>
+
+  {%- include footer.html -%}
+
+  {%- comment -%}
+    Back to top. A plain anchor, so it works with JavaScript off; site.js only
+    controls when it becomes visible.
+  {%- endcomment -%}
+  <a class="to-top" id="to-top" href="#top" aria-label="Back to top" hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 19V5M5 12l7-7 7 7"/>
+    </svg>
+  </a>
+
+  <script src="{{ '/assets/js/site.js' | relative_url }}?v={{ v }}" defer></script>
+  {%- comment -%} Guarded for the reason given above the math include. {%- endcomment -%}
+  {%- if page.mermaid -%}{%- include mermaid.html -%}{%- endif -%}
+  {%- if page.graphviz -%}{%- include graphviz.html -%}{%- endif -%}
+  {%- if page.asciinema -%}{%- include asciinema.html -%}{%- endif -%}
+  {%- include analytics.html -%}
+</body>
+</html>

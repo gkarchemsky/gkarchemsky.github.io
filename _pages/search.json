@@ -1,0 +1,25 @@
+---
+# The search index, built at deploy time. No plugin, so the native GitHub Pages
+# build produces it exactly as `jekyll serve` does.
+#
+# Bodies are truncated: the index is downloaded in full by anyone who opens
+# /search/, and a handful of long write-ups would otherwise make that a
+# multi-megabyte fetch. 8000 characters covers roughly the first two thirds of
+# a median-length post; the title, description and tags carry the rest of the weight.
+layout: null
+permalink: /search.json
+sitemap: false
+---
+[
+{%- for post in site.posts -%}
+{
+"title": {{ post.title | jsonify }},
+"url": {{ post.url | relative_url | jsonify }},
+"date": {{ post.date | date: site.date_format | jsonify }},
+"iso": {{ post.date | date_to_xmlschema | jsonify }},
+"tags": {{ post.tags | jsonify }},
+"description": {{ post.description | default: post.excerpt | strip_html | normalize_whitespace | truncate: 220 | jsonify }},
+"body": {{ post.content | strip_html | normalize_whitespace | truncate: 8000 | jsonify }}
+}{%- unless forloop.last -%},{%- endunless -%}
+{%- endfor -%}
+]

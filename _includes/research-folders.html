@@ -1,0 +1,32 @@
+
+{%- assign research_folders = "" | split: "" -%}
+
+{%- for f in site.static_files -%}
+  {%- if f.path contains '/research/' -%}
+    {%- assign parts = f.path | remove_first: "/research/" | split: "/" -%}
+    {%- comment -%} > 1 so research/README.md itself is not read as a folder. {%- endcomment -%}
+    {%- if parts.size > 1 -%}
+      {%- unless research_folders contains parts[0] -%}
+        {%- assign research_folders = research_folders | push: parts[0] -%}
+      {%- endunless -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- for p in site.pages -%}
+  {%- if p.url contains '/research/' -%}
+    {%- assign tail = p.url | remove_first: "/research/" -%}
+    {%- comment -%}
+      Only directory-style URLs are folders. This drops /research/ itself (tail
+      is empty) and would drop a hypothetical /research/notes.html, which is a
+      page in the section rather than an artifacts folder.
+    {%- endcomment -%}
+    {%- assign last_char = tail | slice: -1 -%}
+    {%- assign parts = tail | split: "/" -%}
+    {%- if parts.size == 1 and last_char == "/" -%}
+      {%- unless research_folders contains parts[0] -%}
+        {%- assign research_folders = research_folders | push: parts[0] -%}
+      {%- endunless -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}

@@ -1,0 +1,20 @@
+{%- comment -%}
+Reading time in minutes.
+
+Computed from the post body, so it is never stale or hand-maintained. A
+`read_time:` value in front matter overrides it, for the cases where the
+estimate is wrong — a post that is mostly disassembly reads far slower than
+its word count suggests.
+
+  {% include read-time.html post=post %}
+
+200 wpm is the usual convention. Dense technical prose runs slower, so treat
+the result as a floor rather than a promise.
+{%- endcomment -%}
+{%- if include.post.read_time -%}
+  {{ include.post.read_time }}
+{%- else -%}
+  {%- assign words = include.post.content | number_of_words -%}
+  {%- assign mins = words | divided_by: 200.0 | ceil -%}
+  {%- if mins < 1 %}1{% else %}{{ mins }}{% endif -%}
+{%- endif -%}

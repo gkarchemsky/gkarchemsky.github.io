@@ -1,0 +1,17 @@
+# Publications, talks and papers — rendered by publications.md.
+#
+# Empty on purpose: the page shows "Nothing here yet" until the first entry is
+# added, so it is safe to publish now. Copy the block below and uncomment.
+#
+# - title:   "A Talk Title"
+#   kind:    talk               # talk | keynote | training | workshop | paper |
+#                              # article | guest post | book | thesis | podcast | panel
+#                              # (tools live on their own page, not here)
+#   venue:   "OFFENSIVECON 2026"
+#   date:    2026-05-14
+#   authors: ["George Karchemsky"]
+#   url:     https://example.com/talk
+#   slides:  /assets/docs/a-talk.pdf
+#   video:   https://youtube.com/watch?v=…
+#   code:    /research/<slug>/
+#   note:    "One line on what the talk covered."

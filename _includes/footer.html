@@ -1,0 +1,19 @@
+<footer class="site-footer">
+  <div class="wrap">
+    {%- comment -%}
+      Everywhere except the home page. The intro under the name already carries
+      this exact row, and two identical icon rows on one screen read as a
+      duplicate rather than as emphasis. No other page has that intro, so there
+      the footer is the only place the links appear.
+    {%- endcomment -%}
+    {%- unless page.url == "/" %}
+    <div class="footer-socials">
+      {%- include social.html size="lg" -%}
+    </div>
+    {%- endunless %}
+
+    <div class="footer-meta">
+      <span>&copy; {{ 'now' | date: "%Y" }} {{ site.author.name }}</span>
+    </div>
+  </div>
+</footer>

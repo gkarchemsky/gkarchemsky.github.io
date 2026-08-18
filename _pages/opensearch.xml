@@ -1,0 +1,23 @@
+---
+layout: null
+permalink: /opensearch.xml
+sitemap: false
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OpenSearch descriptor. Lets a browser register this site as a search engine:
+  type the domain in the address bar, press Tab, and search the blog directly.
+  Firefox offers it automatically; Chrome adds it after a couple of visits.
+
+  The Url template points at /search/, which already reads ?q= from the URL.
+-->
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/"
+                       xmlns:moz="http://www.mozilla.org/2006/browser/search/">
+  <ShortName>{{ site.author.handle | default: site.title }}</ShortName>
+  <Description>{{ site.description | strip_newlines | truncate: 120 }}</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Image width="16" height="16" type="image/x-icon">{{ '/favicon.ico' | absolute_url }}</Image>
+  <Url type="text/html" method="get"
+       template="{{ '/search/' | absolute_url }}?q={searchTerms}"/>
+  <moz:SearchForm>{{ '/search/' | absolute_url }}</moz:SearchForm>
+</OpenSearchDescription>

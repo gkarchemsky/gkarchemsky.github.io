@@ -1,0 +1,60 @@
+---
+layout: default
+permalink: /404.html
+title: "404"
+description: That page does not exist — here is the way back to the write-ups.
+sitemap: false
+---
+{%- comment -%}
+  GitHub Pages serves this for any unmatched path on the custom domain.
+
+  Cats are read from assets/img/cats/ at build time — drop a file in, it joins
+  the rotation, nothing here needs editing. Jekyll renders one server-side so
+  the page works without JavaScript; site.js then reshuffles on each visit so
+  it is not the same cat every time.
+
+  With the folder empty the whole block is skipped and the page still reads
+  correctly.
+{%- endcomment -%}
+{%- assign cats = site.static_files
+      | where_exp: "f", "f.path contains '/assets/img/cats/'"
+      | where_exp: "f", "f.extname != '.md'" -%}
+
+<div class="wrap">
+  <section class="fourohfour">
+    <p class="eyebrow-404">Error 404</p>
+    <h1>Segmentation fault</h1>
+    <p class="lede-404">
+      That page doesn&rsquo;t exist. Somewhere a pointer went somewhere it
+      shouldn&rsquo;t have &mdash; on this occasion, harmlessly.
+    </p>
+
+    {%- if cats.size > 0 -%}
+      {%- comment -%} Seed the server-side pick from the build time. {%- endcomment -%}
+      {%- assign seed = site.time | date: '%s' | modulo: cats.size -%}
+      {%- assign cat = cats[seed] -%}
+      {%- assign cat_name = cat.basename | replace: '-', ' ' | replace: '_', ' ' | capitalize -%}
+
+      <figure class="cat" id="cat-figure">
+        <img id="cat-img" src="{{ cat.path | relative_url }}"
+             alt="One of the cats" decoding="async">
+        <figcaption id="cat-name">{{ cat_name }}</figcaption>
+      </figure>
+
+      <script id="cat-data" type="application/json">
+        {{ cats | map: "path" | jsonify }}
+      </script>
+    {%- endif -%}
+
+    {%- comment -%}
+      One way out, not two. A 404 is a dead end and the reader's only real
+      question is "where do I start again" — offering a second destination
+      beside the answer makes them choose instead of just leaving.
+    {%- endcomment -%}
+    <p class="back-404">
+      <a class="btn" href="{{ '/' | relative_url }}">
+        <span class="arrow" aria-hidden="true">&larr;</span> Back home
+      </a>
+    </p>
+  </section>
+</div>

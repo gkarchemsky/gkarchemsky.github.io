@@ -1,0 +1,311 @@
+---
+layout: default
+---
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<div class="wrap">
+      <article>
+
+
+      {%- comment -%}
+        data-canonical is read by the print stylesheet, which hides the header,
+        the footer and the back link and would otherwise leave a printed page
+        with nothing on it identifying where it came from.
+      {%- endcomment -%}
+      <header class="post-header" data-canonical="{{ page.url | absolute_url }}">
+        {%- comment -%}
+          Back to the list this post belongs to. At the top rather than the
+          foot: this is the link a reader wants when they have just arrived and
+          decided the post is not the one they were after, and the foot of the
+          page already carries related posts and the older/newer pager.
+
+          A CTF write-up returns to /ctf/ and everything else to /blog/, so the
+          link always goes back to the list the reader most likely came from.
+          Falls back to /blog/ if the CTF page has been unpublished, since a
+          dead link is worse than a slightly wrong destination.
+        {%- endcomment -%}
+        {%- assign ctf_page = site.pages | where: "url", "/ctf/" | first -%}
+        {%- if page.categories contains 'ctf' and ctf_page -%}
+          {%- assign back_url = '/ctf/' -%}
+          {%- assign back_label = 'All CTF write-ups' -%}
+
+        {%- else -%}
+          {%- assign back_url = '/blog/' -%}
+          {%- assign back_label = 'All posts' -%}
+
+        {%- endif -%}
+
+        <p class="post-back">
+          <a href="{{ back_url | relative_url }}">
+            {{ back_label }} <span aria-hidden="true">&rarr;</span>
+          </a>
+        </p>
+
+        {%- comment -%}
+          Publication date leads; the revision date is secondary and appears
+          only once `last_modified_at` is set. That field name is deliberate —
+          jekyll-feed uses it for <updated> in the Atom feed and jekyll-seo-tag
+          for schema.org dateModified, so one front-matter line drives all three.
+        {%- endcomment -%}
+        <div class="meta">
+          <time datetime="{{ page.date | date_to_xmlschema }}">
+            {{ page.date | date: site.date_format }}
+          </time>
+          {%- if page.last_modified_at %}
+          <span aria-hidden="true">&middot;</span>
+          <span class="updated">updated
+            <time datetime="{{ page.last_modified_at | date_to_xmlschema }}">
+              {{ page.last_modified_at | date: site.date_format }}
+            </time>
+          </span>
+          {%- endif %}
+          {%- comment -%}
+              A byline keeps the work attributed when a post is mirrored or
+              scraped. `author:` in front matter overrides it — set it to a
+              list for co-authored research, which is the case this exists for.
+          {%- endcomment -%}
+          {%- assign byline = page.author | default: site.author.name -%}
+          <span aria-hidden="true">&middot;</span>
+          <span class="byline">
+            {%- if byline.size > 0 and byline.first -%}
+              {%- for a in byline -%}
+                <span>{{ a }}</span>
+                {%- unless forloop.last %}{% if forloop.rindex == 2 %} and {% else %}, {% endif %}{% endunless -%}
+              {%- endfor -%}
+            {%- else -%}
+              <span>{{ byline }}</span>
+            {%- endif -%}
+          </span>
+          <span aria-hidden="true">&middot;</span><span>{% include read-time.html post=page %} min read</span>
+        </div>
+
+        <h1>{{ page.title }}</h1>
+
+        {%- if page.description %}
+        <p class="lede">{{ page.description }}</p>
+        {%- endif %}
+
+        {%- comment -%}
+          Chips link into /tags/ only while that page is published; with it
+          disabled they render as plain labels rather than 404s. Re-enabling
+          the page restores the links with no edit here.
+        {%- endcomment -%}
+        {%- assign tags_page = site.pages | where: "url", "/tags/" | first -%}
+        {%- if page.tags and page.tags.size > 0 %}
+        <ul class="tags">
+          {%- for t in page.tags %}
+          <li>
+            {%- comment -%}
+              data-tag matches the chips on /tags/ and the small tags on each
+              row there. It is what the stylesheet keys the per-tag colouring
+              off, so a tag that has a colour has it in all three places
+              rather than only where a filter happens to be wired up.
+            {%- endcomment -%}
+            {%- if tags_page -%}
+              <a class="tag" data-tag="{{ t | slugify }}" href="{{ '/tags/' | relative_url }}?tags={{ t | slugify }}">{{ t }}</a>
+            {%- else -%}
+              <span class="tag" data-tag="{{ t | slugify }}">{{ t }}</span>
+            {%- endif -%}
+          </li>
+          {%- endfor %}
+        </ul>
+        {%- endif %}
+
+        {%- comment -%}
+          Multi-part series banner. Set `series: "Name"` and `part: N` in front
+          matter; every post sharing that series name is listed, ordered by part.
+        {%- endcomment -%}
+        {%- if page.series %}
+          {%- comment -%}
+            `series_parts`, not `parts`: Jekyll includes share the caller's
+            scope, and _includes/research-folders.html assigns `parts` too.
+            Nothing breaks today only because the include runs after this
+            block; reordering them would silently empty the banner.
+          {%- endcomment -%}
+          {%- assign series_parts = site.posts | where: "series", page.series | sort: "part" -%}
+          {%- if series_parts.size > 1 %}
+          <nav class="series" aria-labelledby="series-h">
+            <p class="series-label" id="series-h">{{ page.series }} &mdash; {{ series_parts.size }} part series</p>
+            <ol>
+              {%- for p in series_parts %}
+              <li{% if p.url == page.url %} aria-current="true"{% endif %}>
+                {%- if p.url == page.url -%}
+                  {{ p.title }} <span style="opacity:.6">(you are here)</span>
+                {%- else -%}
+                  <a href="{{ p.url | relative_url }}">{{ p.title }}</a>
+                {%- endif -%}
+              </li>
+              {%- endfor %}
+            </ol>
+          </nav>
+          {%- endif %}
+        {%- endif %}
+
+        {%- comment -%}
+          Link the companion folder in the repo: PoCs, exploit source, patches.
+          Front matter: `artifacts: <folder-name>`
+        {%- endcomment -%}
+        {%- comment -%}
+          What counts as "actually in the repo" is defined once, in
+          research-folders.html, because /research/ builds its index from the
+          same list. When this test lived here as its own static-files scan the
+          two fell out of step and the box vanished from every post.
+        {%- endcomment -%}
+        {%- include research-folders.html -%}
+        {%- assign artifact_exists = false -%}
+        {%- if page.artifacts and research_folders contains page.artifacts -%}
+          {%- assign artifact_exists = true -%}
+        {%- endif -%}
+        {%- if page.artifacts and artifact_exists == false -%}
+        <!-- artifacts: "{{ page.artifacts }}" — no such folder under research/, box omitted -->
+        {%- endif -%}
+        {%- if page.artifacts and artifact_exists %}
+        <div class="artifacts">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2Z"/></svg>
+          <div>
+            <span class="t">Artifacts</span>
+            <p>Proof-of-concept code and supporting material for this post live in
+              <a href="https://github.com/{{ site.social.github }}/{{ site.social.github }}.github.io/tree/main/research/{{ page.artifacts }}"><code>research/{{ page.artifacts }}/</code></a>.
+            </p>
+          </div>
+        </div>
+        {%- endif %}
+      </header>
+
+      {%- comment -%}
+        The TOC precedes the body in source order so that on narrow screens,
+        where the shell collapses to a single flex column, it lands directly
+        under the header instead of at the foot of the article.
+      {%- endcomment -%}
+      <div class="article-shell">
+        <div class="prose" id="post-body">
+          {{ content }}
+        </div>
+
+        {%- comment -%}
+          <nav>, not <aside>: it is a list of links into this document, which
+          is what the navigation role is for, and it gives screen-reader users
+          a "Contents" landmark to jump to instead of an unnamed complementary
+          region. The heading names the landmark via aria-labelledby.
+        {%- endcomment -%}
+        {%- if page.toc %}
+        <nav class="toc" id="toc" aria-labelledby="toc-h" hidden>
+          <p class="toc-title" id="toc-h">Contents</p>
+          <ul id="toc-list"></ul>
+        </nav>
+        {%- endif %}
+      </div>
+
+      {%- comment -%}
+        Substantive corrections get logged rather than silently edited. Front
+        matter:
+          revisions:
+            - date: 2026-03-02
+              note: "What changed, and why."
+      {%- endcomment -%}
+      {%- if page.revisions and page.revisions.size > 0 %}
+      <aside class="revisions" aria-labelledby="revisions-h">
+        <p class="revisions-title" id="revisions-h">Revisions</p>
+        <ul>
+          {%- for r in page.revisions %}
+          <li>
+            <time datetime="{{ r.date | date_to_xmlschema }}">{{ r.date | date: site.date_format }}</time>
+            <span>{{ r.note }}</span>
+          </li>
+          {%- endfor %}
+        </ul>
+      </aside>
+      {%- endif %}
+
+
+      {%- comment -%}
+        Order below the post: related, then the chronological pager, then the
+        discussion.
+
+
+        Related above the pager because shared subject beats calendar order:
+        consecutive posts here are unrelated to each other (a research
+        write-up sits next to a CTF one), so "older/newer" is an accident of
+        when things were written. Note that related now excludes same-series
+        posts — the banner at the top of the page owns those — so on a site
+        whose posts are all one series it renders nothing, and this reduces to
+        the pager-then-comments pair.
+
+        The pager stays: it is the only way to walk the archive in order
+        without going back to /blog/.
+      {%- endcomment -%}
+      {%- include related.html limit=3 -%}
+
+      {%- assign this_is_ctf = false -%}
+      {%- if page.categories contains 'ctf' %}{% assign this_is_ctf = true %}{% endif -%}
+
+      {%- assign stream = "" | split: "" -%}
+      {%- for p in site.posts -%}
+        {%- assign p_is_ctf = false -%}
+        {%- if p.categories contains 'ctf' %}{% assign p_is_ctf = true %}{% endif -%}
+        {%- if p_is_ctf == this_is_ctf -%}
+          {%- assign stream = stream | push: p -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- assign here = -1 -%}
+      {%- for p in stream -%}
+        {%- if p.url == page.url %}{% assign here = forloop.index0 %}{% endif -%}
+      {%- endfor -%}
+
+      {%- assign newer_post = false -%}
+      {%- assign older_post = false -%}
+      {%- if here > 0 -%}
+        {%- assign i = here | minus: 1 -%}
+        {%- assign newer_post = stream[i] -%}
+      {%- endif -%}
+      {%- assign i = here | plus: 1 -%}
+      {%- if here >= 0 and i < stream.size -%}
+        {%- assign older_post = stream[i] -%}
+      {%- endif -%}
+
+      {%- comment -%}
+        Only when there is somewhere to go. With one published post in a stream
+        the nav rendered anyway: a landmark containing a heading, a rule and an
+        empty <span>.
+      {%- endcomment -%}
+      {%- if newer_post or older_post %}
+      <nav class="pager" aria-labelledby="pager-h">
+        {%- comment -%}
+          Titled and ruled off, so it does not read as a continuation of the
+          related grid above it. Deliberately plain: the two cards below say
+          "older" and "newer" themselves, so the heading only has to mark where
+          one block ends and the next begins.
+
+          "Older/Newer" rather than the field's more common "Previous/Next"
+          (~5:1): now that related sits above, this bar is purely chronological,
+          and "previous" is ambiguous about whether it means time or reading
+          order.
+        {%- endcomment -%}
+        {%- comment -%}
+          The heading names the stream, so the reader knows what "older" will
+          give them before they click. "More write-ups" on a CTF page rather
+          than the site-wide "More posts".
+        {%- endcomment -%}
+        <p class="pager-title" id="pager-h">
+          {%- if this_is_ctf %}More write-ups{% else %}More posts{% endif -%}
+        </p>
+        {%- if older_post %}
+        <a class="prev" rel="prev" href="{{ older_post.url | relative_url }}">
+          <span class="dir">&larr; Older</span>
+          <span class="t">{{ older_post.title }}</span>
+        </a>
+        {%- else %}<span></span>{%- endif %}
+
+        {%- if newer_post %}
+        <a class="next" rel="next" href="{{ newer_post.url | relative_url }}">
+          <span class="dir">Newer &rarr;</span>
+          <span class="t">{{ newer_post.title }}</span>
+        </a>
+        {%- endif %}
+      </nav>
+      {%- endif %}
+
+      {%- include comments.html -%}
+    </article>
+</div>
