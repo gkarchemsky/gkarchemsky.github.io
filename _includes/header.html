@@ -33,6 +33,19 @@
       {%- if pubs_page %}
       <a class="nav-link" href="{{ '/publications/' | relative_url }}"{% if p contains '/publications' %} aria-current="page"{% endif %}>Publications</a>
       {%- endif %}
+      {%- comment -%}
+        Last of the content links, and after Publications on purpose: Advisories
+        and Publications are the same kind of thing — a record of work already
+        done — and Tools splitting them read as a list with no grouping.
+
+        Worth revisiting once this page has something in it. Writing is read
+        once; a queryable dataset is the one thing a reader comes back to, which
+        is an argument for promoting it much higher. Premature while it is empty.
+      {%- endcomment -%}
+      {%- assign tools_page = site.pages | where: "url", "/tools/" | first -%}
+      {%- if tools_page %}
+      <a class="nav-link" href="{{ '/tools/' | relative_url }}"{% if p contains '/tools' %} aria-current="page"{% endif %}>Tools</a>
+      {%- endif %}
       <a class="nav-link" href="{{ '/about/' | relative_url }}"{% if p contains '/about' %} aria-current="page"{% endif %}>About</a>
     </nav>
 

@@ -1,0 +1,70 @@
+---
+# The nav link switches itself on whenever this page exists — set
+# `published: false` to take the page and the link back out together, the same
+# way /tags/ and /publications/ work.
+layout: default
+title: Tools
+permalink: /tools/
+description: Datasets and utilities for reverse engineering, vulnerability research and exploit development.
+---
+
+<div class="wrap">
+  <header class="page-head">
+    <h1>Tools</h1>
+    <p class="lede">Databases and tools I build and maintain.</p>
+  </header>
+
+  {%- comment -%}
+    Driven by _data/tools.yml, so adding one is a YAML entry rather than an edit
+    here — the same arrangement as _data/advisories.yml and _data/publications.yml.
+
+    Everything lives in one list rather than being split by kind. Splitting is
+    worth revisiting once there is enough here for it to earn its keep; with a
+    handful of entries it would be two near-empty lists instead of one short one.
+
+    Fields per entry:
+      name        required
+      kind        database | utility | plugin      — rendered as the chip
+      summary     one sentence, no more
+      url         where it lives on this site, if it is hosted here
+      repo        GitHub URL, if there is source to read
+      status      live | building                  — omit once it is live
+  {%- endcomment -%}
+
+  {%- assign tools = site.data.tools -%}
+
+  {%- if tools and tools.size > 0 -%}
+    <ul class="pub-list">
+      {%- for t in tools %}
+      <li class="pub-item">
+        <div class="meta">
+          <span class="pub-kind">{{ t.kind | default: "tool" }}</span>
+          {%- if t.status and t.status != "live" %}
+          <span aria-hidden="true">&middot;</span><span class="pub-venue">{{ t.status }}</span>
+          {%- endif %}
+        </div>
+
+        <h2>
+          {%- if t.url -%}
+            <a href="{{ t.url | relative_url }}">{{ t.name }}</a>
+          {%- elsif t.repo -%}
+            <a href="{{ t.repo }}" rel="noopener">{{ t.name }}</a>
+          {%- else -%}
+            {{ t.name }}
+          {%- endif -%}
+        </h2>
+
+        {%- if t.summary %}<p class="pub-note">{{ t.summary }}</p>{% endif %}
+
+        {%- if t.url and t.repo %}
+        <p class="pub-links">
+          <a href="{{ t.repo }}" rel="noopener">source</a>
+        </p>
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ul>
+  {%- else -%}
+    <p class="empty">Nothing here yet &mdash; the first one is in progress.</p>
+  {%- endif -%}
+</div>
