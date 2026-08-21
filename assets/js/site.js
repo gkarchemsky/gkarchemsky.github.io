@@ -300,6 +300,7 @@
     var HYSTERESIS = 48;     /* extra room demanded before expanding again */
     var navWidth = 0;        /* natural inline width of the links, once seen */
     var collapsedAtRail = 0; /* rail width when the bar last collapsed */
+    var collapsedByRule = false; /* true when the CSS collapsed it, not this code */
     var busy = false;
 
     var widthRuleOwns = function () {
@@ -567,7 +568,11 @@
          The return still matters for the other reason: below the breakpoint the
          nav is `position: fixed` and reports a viewport-wide box, so measuring
          it here would poison the cached natural width. */
-      if (widthRuleOwns()) { hdr.classList.add('nav-collapsed'); return; }
+      if (widthRuleOwns()) {
+        hdr.classList.add('nav-collapsed');
+        collapsedByRule = true;
+        return;
+      }
 
       if (!hdr.classList.contains('nav-collapsed')) {
         /* Inline: the links are laid out, so this is the one chance to learn
@@ -581,6 +586,7 @@
         if (!menuFits(0)) {
           hdr.classList.add('nav-collapsed');
           collapsedAtRail = railWidth();
+          collapsedByRule = false;
         }
         return;
       }
@@ -591,7 +597,45 @@
          stay collapsed. HYSTERESIS keeps the two thresholds apart — deciding
          both directions from one number makes the header flap at the width
          where collapsing is what creates the room to expand. */
-      if (!navWidth) return;
+      if (!navWidth) {
+        /* A page that *loaded* collapsed has never had the links laid out
+           inline, so there is nothing cached to predict from. Returning here
+           was wrong: it meant widening the window could never bring the menu
+           back, at any width, however much room appeared. Only a reload fixed
+           it — because a reload at the wider width runs the inline branch
+           above and learns the number there. Reproduced at 900->1500,
+           1000->1400 and 500->1500; loading wide was the one case that worked.
+
+           So take the reading now instead of giving up. Drop the class, read
+           the natural width, put it back — all synchronously, so no frame is
+           painted in between: getBoundingClientRect forces layout, not paint.
+           Transitions are frozen for the duration because .nav-collapsed also
+           moves the controls' order and margins, which would otherwise animate
+           through the intermediate state.
+
+           widthRuleOwns() is already false here — the early return at the top
+           of this function guarantees it — so the inline layout the probe asks
+           for is one the CSS will actually give.
+
+           Runs once per page: after this navWidth is cached like any other. */
+        var root = document.documentElement;
+        var probe = 0;
+        root.classList.add('is-measuring');
+        try {
+          hdr.classList.remove('nav-collapsed');
+          probe = Math.round(navEl.getBoundingClientRect().width);
+        } finally {
+          /* finally, not straight-line code: if the read ever threw, the page
+             would be left collapsed with .is-measuring stuck on the root — and
+             that class kills every transition on the site, not just this one.
+             The restore has to happen whatever occurs above. */
+          hdr.classList.add('nav-collapsed');
+          void navEl.getBoundingClientRect();   /* commit the restored state */
+          root.classList.remove('is-measuring');
+        }
+        if (probe > 0) navWidth = probe;
+        else return;
+      }
       /* HYSTERESIS guards against flapping while the window is being resized, so
          it is charged only when the rail has actually changed width since the
          collapse. At the same width the collapse was caused by something else —
@@ -599,9 +643,23 @@
          open search field is no longer one of those reasons: menuFits() is
          computed from the closed row, so opening the field cannot collapse
          anything. */
+      /* Hysteresis is charged only against a collapse this code decided on.
+         A collapse the CSS owns below the breakpoint is not a decision and
+         cannot flap: the breakpoint is a fixed number that does not move when
+         the bar changes shape, so crossing it upward happens once. Charging it
+         there left the bar a hamburger from 1040 up to about 1124 — widths
+         where loading the page directly gives the full menu, because the
+         inline branch above never charges anything. Resizing and loading
+         disagreed for 84px, which is the bug this whole tier exists to catch.
+
+         collapsedAtRail is also meaningless after a rule-owned collapse: the
+         early return above never records it, so the comparison below was
+         against 0 and railUnchanged was false for that reason alone. */
       var railUnchanged = Math.abs(railWidth() - collapsedAtRail) < 1;
-      if (menuFits(railUnchanged ? 0 : HYSTERESIS)) {
+      var charge = collapsedByRule || railUnchanged ? 0 : HYSTERESIS;
+      if (menuFits(charge)) {
         hdr.classList.remove('nav-collapsed');
+        collapsedByRule = false;
         /* An open panel must not survive into the inline layout, where nothing
            would ever close it again. */
         navEl.classList.remove('open');

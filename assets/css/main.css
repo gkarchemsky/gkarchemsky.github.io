@@ -182,6 +182,19 @@ html {
   transition: none !important;
 }
 
+/* The same freeze, for the one synchronous measurement the header takes with
+   .nav-collapsed briefly removed (see measureNav in site.js). Reading the
+   links' natural width means laying them out inline for an instant; nothing is
+   painted in that instant, but .nav-collapsed also moves the controls' `order`
+   and margins, and those would otherwise animate on the way out and back.
+   Separate from .is-preload because that class carries its own meaning — the
+   load-time freeze — and the tracer reads it. */
+:root.is-measuring *,
+:root.is-measuring *::before,
+:root.is-measuring *::after {
+  transition: none !important;
+}
+
 /* No scroll guard here any more: with no global smooth to suppress, there is
    nothing for a load-time guard to do. See the note on `html` above. */
 
@@ -1326,7 +1339,7 @@ html:has(.site-header.search-panel.search-open) body::after {
   display: flex;
   flex-direction: column;
 }
-.stream .featured { flex: 1; align-items: flex-start; }
+.stream .featured { flex: 1 1 auto; align-items: flex-start; }
 .stream .featured .excerpt { flex: 1 0 auto; }
 
 /* The list under each featured card is a compact index — date and title only.
