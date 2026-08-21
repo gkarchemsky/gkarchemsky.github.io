@@ -257,6 +257,13 @@ readme_index:
 theme: null
 
 exclude:
+  # Cloudflare Pages Functions. Read by Pages from the repository root, never
+  # by Jekyll, and publishing the source would put the request-logging code and
+  # its bot patterns on the site. It happens to be skipped today because
+  # Jekyll ignores files beginning with an underscore and the only file here is
+  # _middleware.js — this line is what makes that intentional rather than luck,
+  # and what protects a future functions/something.js that has no underscore.
+  - functions
   - tools
   - Gemfile
   - Gemfile.lock
