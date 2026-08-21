@@ -2,6 +2,11 @@
 # The search index, built at deploy time. No plugin, so the native GitHub Pages
 # build produces it exactly as `jekyll serve` does.
 #
+# Posts and pages both, because a reader looking for the advisories table or
+# the about page is searching the site, not a corpus of write-ups. Pages carry
+# no date and no tags, so each entry says which kind it is and the renderer
+# lays the two out differently.
+#
 # Bodies are truncated: the index is downloaded in full by anyone who opens
 # /search/, and a handful of long write-ups would otherwise make that a
 # multi-megabyte fetch. 8000 characters covers roughly the first two thirds of
@@ -10,9 +15,18 @@ layout: null
 permalink: /search.json
 sitemap: false
 ---
+{%- comment -%}
+  A comma before every entry except the first, rather than `forloop.last`.
+  Entries are filtered inside the loop, so the last iteration is not
+  necessarily the last entry emitted — and one trailing comma is the whole
+  file failing to parse.
+{%- endcomment -%}
+{%- assign first = true -%}
 [
 {%- for post in site.posts -%}
+{%- unless first %},{% endunless -%}{%- assign first = false -%}
 {
+"kind": "post",
 "title": {{ post.title | jsonify }},
 "url": {{ post.url | relative_url | jsonify }},
 "date": {{ post.date | date: site.date_format | jsonify }},
@@ -20,6 +34,42 @@ sitemap: false
 "tags": {{ post.tags | jsonify }},
 "description": {{ post.description | default: post.excerpt | strip_html | normalize_whitespace | truncate: 220 | jsonify }},
 "body": {{ post.content | strip_html | normalize_whitespace | truncate: 8000 | jsonify }}
-}{%- unless forloop.last -%},{%- endunless -%}
+}
+{%- endfor -%}
+
+{%- comment -%}
+  Every page that a reader can land on, minus three that would be noise:
+  /404.html, which is what you get when you were looking for something else;
+  /search/ itself; and everything under /research/. Anything else opts out with
+  `search: false` in its front matter. The URL test keeps the feed, the
+  sitemap, opensearch.xml and this file out — they are pages to Jekyll but not
+  to a reader.
+
+  /research/ is excluded here, in a tracked file, rather than left to the
+  .gitignore that keeps it off GitHub. The folders under it hold proof-of-
+  concept material for work that is not published yet, and a rule that lives
+  only in .gitignore is one deleted line away from putting their titles in an
+  index the whole site downloads. Two independent reasons for them to be
+  absent is the right number. Drop this when the write-ups are out and the
+  folder is tracked alongside them.
+{%- endcomment -%}
+{%- for p in site.pages -%}
+{%- assign ext = p.url | split: "." | last -%}
+{%- assign head = p.url | slice: 0, 10 -%}
+{%- if p.url == "/404.html" or p.url == "/search/" or head == "/research/" or p.search == false -%}
+  {%- continue -%}
+{%- endif -%}
+{%- unless p.url contains ".html" or ext == p.url or p.url == "/" -%}
+  {%- continue -%}
+{%- endunless -%}
+{%- unless first %},{% endunless -%}{%- assign first = false -%}
+{
+"kind": "page",
+"title": {{ p.title | default: "Untitled" | jsonify }},
+"url": {{ p.url | relative_url | jsonify }},
+"tags": [],
+"description": {{ p.description | strip_html | normalize_whitespace | truncate: 220 | jsonify }},
+"body": {{ p.content | strip_html | normalize_whitespace | truncate: 8000 | jsonify }}
+}
 {%- endfor -%}
 ]

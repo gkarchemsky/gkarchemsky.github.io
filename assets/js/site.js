@@ -2,16 +2,47 @@
 (function () {
   'use strict';
 
+  /* ------------------------------------------------------------- preload */
+  /* Let transitions run again, now that every value on the page has settled.
+     The head marks the document `is-preload` before any stylesheet loads; see
+     the note there for what it prevents. Released after `load` and one frame
+     beyond it, so the release itself cannot be what a transition animates
+     from. */
+  (function () {
+    var root = document.documentElement;
+    var release = function () {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          root.classList.remove('is-preload');
+        });
+      });
+    };
+    if (document.readyState === 'complete') release();
+    else window.addEventListener('load', release);
+  })();
+
+  /* --------------------------------------------------------- press states */
+  /* iOS Safari does not apply :active to an arbitrary element unless the
+     document has a touch listener bound somewhere. Without this the press
+     feedback added for touch — the whole point of guarding every :hover
+     behind (hover: hover) — silently never fires on the one platform it was
+     written for. An empty passive listener is the whole fix; it binds nothing
+     and cannot block a scroll. */
+  document.addEventListener('touchstart', function () {}, { passive: true });
+
   /* ------------------------------------------------------- reduced motion */
   /* Every programmatic scroll goes through this.
    *
-   * The CSS `@media (prefers-reduced-motion: reduce)` block resets
-   * `html { scroll-behavior }` to auto, but that only governs scrolls which do
-   * not state a behavior of their own. `scrollTo({behavior: 'smooth'})` names
-   * one explicitly and overrides the reset, so two call sites were animating
-   * for readers who had asked the OS for no animation — the exact people the
-   * media query exists for. 'instant' is the only value that reliably wins,
-   * because 'auto' inherits the smooth from the stylesheet.
+   * A stylesheet cannot decide this. `scrollTo({behavior: 'smooth'})` states a
+   * behavior explicitly, and an explicit value beats any rule — so two call
+   * sites were animating for readers who had asked the OS for no animation,
+   * the exact people the reduced-motion query exists for. The choice has to be
+   * made where the call is made, which is here.
+   *
+   * These are also the only scrolls on the site that animate at all: there is
+   * no global `scroll-behavior: smooth`, because it would apply to scrolls the
+   * browser performs on its own — restoring your position after a refresh
+   * among them. See the note on `html` in main.css.
    *
    * Read per call rather than cached: the setting can change mid-session. */
   function scrollBehavior() {
@@ -205,10 +236,18 @@
   /* ------------------------------------------------------------ mobile nav */
   var navBtn = document.querySelector('.nav-toggle');
   var nav = document.getElementById('site-nav');
+  /* Assigned by the search expander further down, and only ever called after
+     a click, so the hoisted `var` is enough to bridge the two blocks. */
+  var closeSearchPanel = null;
   if (navBtn && nav) {
     navBtn.addEventListener('click', function () {
       var open = nav.classList.toggle('open');
       navBtn.setAttribute('aria-expanded', String(open));
+      /* Both panels dock at the bar's bottom edge, and the search panel is
+         later in the markup, so with both open it paints over the menu's first
+         two links. One of them has to yield, and it is the one the reader did
+         not just ask for. */
+      if (open && closeSearchPanel) closeSearchPanel();
     });
 
     /* Clicking the page dismisses the menu.
@@ -265,6 +304,7 @@
     var MIN_GAP = 8;
     var HYSTERESIS = 48;     /* extra room demanded before expanding again */
     var navWidth = 0;        /* natural inline width of the links, once seen */
+    var collapsedAtRail = 0; /* rail width when the bar last collapsed */
     var busy = false;
 
     var widthRuleOwns = function () {
@@ -309,6 +349,16 @@
       return Math.max(0, now - min);
     };
 
+    /* True while a close is in flight: the class says shut, the field is still
+       most of its open width, and it will not be for much longer. Any decision
+       taken now is taken against a row that is about to change by up to 190px.
+       Only the expanding direction has to care — collapsing early, while the
+       field is on its way open, is the point. */
+    var fieldSettling = function () {
+      return !!field && !hdr.classList.contains('search-open')
+             && field.getBoundingClientRect().width > 1;
+    };
+
     var fits = function (slack) {
       var gap = parseFloat(window.getComputedStyle(wrap).columnGap) || 0;
       var need = brand.scrollWidth
@@ -320,7 +370,214 @@
       return need + (slack || 0) <= railWidth();
     };
 
+    /* ------------------------------------------------- panel fallback ----- */
+
+    /* Extra room demanded before the field comes back into the bar. Small on
+       purpose: .brand keeps its natural width in both states, so the same
+       number decides both directions and there is no feedback loop to damp —
+       this is only here so a resize that lands on the threshold cannot flap. */
+    var PANEL_SLACK = 16;
+
+    /* Below the breakpoint only. Above it the links are inline and
+       .nav-collapsed is the mechanism that makes room — two of them competing
+       over one row would fight. Keeping the two in separate width ranges keeps
+       them out of each other's way. */
+    var barIsCompact = widthRuleOwns;
+
+    /* The width an open field refuses to go below, learned once at startup.
+
+       A closed field reports min-width 0, because the floor is declared in the
+       .is-open rule — so the value has to be read while briefly wearing that
+       class, with transitions switched off inline. getComputedStyle forces a
+       style recalculation, and a recalculation is what gives a transition a
+       value to start from; without the `none` this queues a real animation. The
+       reflow before restoring commits the closed state while it is still off. */
+    var fieldFloorPx = 0;
+    var openFieldFloor = function () {
+      if (fieldFloorPx) return fieldFloorPx;
+      if (!field) return 0;
+      var had = field.classList.contains('is-open');
+      var prev = field.style.transition;
+      field.style.transition = 'none';
+      if (!had) field.classList.add('is-open');
+      var w = parseFloat(window.getComputedStyle(field).minWidth) || 0;
+      if (!had) field.classList.remove('is-open');
+      void field.offsetWidth;
+      field.style.transition = prev;
+      fieldFloorPx = w;
+      return w;
+    };
+
+    /* Where the control group ends up once the field has finished opening, not
+       where it happens to be mid-animation. Its min-width is where an open
+       field settles in a tight row, so that is the number the row is planned
+       against from the first frame. */
+    var controlsAtFieldFloor = function () {
+      var w = controls.getBoundingClientRect().width;
+      if (!field) return w;
+      var min = Math.max(parseFloat(window.getComputedStyle(field).minWidth) || 0,
+                         openFieldFloor());
+      return w - field.getBoundingClientRect().width + min;
+    };
+
+    /* What the control group needs, captured only at the two moments the
+       measurement can be believed.
+
+       As a panel the field is absolutely positioned and as wide as the bar, so
+       subtracting it the way controlsAtFieldFloor() does gives a negative
+       number. And with the field open in the bar, .nav-controls carries
+       `min-width: 0` and has already been crushed by the row it no longer fits
+       — reading it there answers "how much room is it being given", not "how
+       much does it need", and the two differ by exactly the amount that would
+       have told us to change shape. Narrowing a window with the field open
+       stayed in the bar for that reason: the group measured small because it
+       was being squeezed, which read as proof that it fitted.
+
+       With the field shut and in the bar there is no squeeze and no absolute
+       positioning, so that reading is the true one and it is the one kept. It
+       is a stable thing to hold on to: with the field discounted to its floor,
+       the group is a separator, two icon buttons and their gaps, none of which
+       vary with the width of the window. */
+    var controlsW = 0;
+    var controlsFloor = function () {
+      var trustworthy = !hdr.classList.contains('search-panel')
+                     && !hdr.classList.contains('search-open');
+      /* Nothing cached yet beats nothing at all — after forgetCachedWidths()
+         the first question may arrive with the field open. */
+      if (trustworthy || !controlsW) controlsW = controlsAtFieldFloor();
+      return controlsW;
+    };
+
+    /* Can one row hold the wordmark, the menu button and the controls at the
+       narrowest the open field will go? Same shape as fits(), minus the nav
+       links, which are in the panel whenever this is asked. */
+    var oneRowHolds = function (slack) {
+      var gap = parseFloat(window.getComputedStyle(wrap).columnGap) || 0;
+      var need = brand.scrollWidth
+        + gap + (hamburger ? hamburger.getBoundingClientRect().width : 0)
+        + gap + controlsFloor();
+      return need + (slack || 0) <= railWidth();
+    };
+
+    /* Every cached number here is in pixels, and a reader changing their text
+       size changes what a pixel is worth without touching the window. The rail
+       stays the width it was, so `resize` does not fire and the hysteresis in
+       measureNav() reads the rail as unchanged — while the cached width of the
+       links, measured at the old size, is now wrong by hundreds of pixels.
+
+       Left alone that is a one-way door: zoom in far enough for the bar to
+       collapse, zoom back out, and the links never come back, because the
+       cached width they are judged against grew with the zoom and never
+       shrank.
+
+       The theme toggle is the sentinel. It is sized in rem, it is on screen at
+       every width, and no decision taken here changes it — so its box moves
+       when, and only when, the text scale does. That last part matters:
+       watching anything the header itself resizes would make this a feedback
+       loop rather than a signal. */
+    var scaleSentinel = hdr.querySelector('.theme-toggle');
+    var lastScale = 0;
+    var scaleChanged = function () {
+      if (!scaleSentinel) return false;
+      var now = scaleSentinel.getBoundingClientRect().width;
+      if (!now) return false;
+      var moved = lastScale > 0 && Math.abs(now - lastScale) > 0.5;
+      lastScale = now;
+      return moved;
+    };
+
+    /* Start over from nothing rather than from a decision taken with worse
+       information. The class is dropped and re-derived in the same task, so
+       nothing paints between the two states. */
+    function forgetCachedWidths() {
+      navWidth = 0;
+      collapsedAtRail = 0;
+      controlsW = 0;
+      fieldFloorPx = 0;
+      hdr.classList.remove('nav-collapsed');
+    }
+
+    /* Which of the two shapes the field has is a property of the bar's width,
+       not of whether the field happens to be open, and it is decided here for
+       both states at once.
+
+       Tying it to the open state instead is a trap worth naming. The field
+       carries a width transition for its in-bar shape and no width at all as a
+       panel, so taking the class off while the field is closing lands the
+       element back on the rule that animates width in the same frame its width
+       changes — and the browser animates it. Whatever the class is keyed to
+       must therefore not change during a close.
+
+       Keyed to the width it never does. The panel takes no room in the row, so
+       the bar is identical open and closed, and this only has an answer to
+       revise when the window changes. */
+    /* Changing shape is a cut, never a tween. The two shapes have different
+       geometry and different transition lists — in the bar the field animates
+       its width, as a panel it has no width of its own — so switching between
+       them hands the browser a pair of values on a property that animates, and
+       it obliges. Dragging a window past the threshold with the field shut ran
+       its hidden box from 602px down to zero over 150ms, shunting the icons
+       along for the ride; dragging back the other way brought the caret in
+       under a field that had not arrived yet.
+
+       So the class change is committed with transitions off. The forced reflow
+       is what makes that stick: it recalculates style while `none` is in
+       effect, and a transition with no start value never begins. Restoring
+       them a task later cannot start one retroactively — a transition needs a
+       property to change while it is in force, and by then nothing is. */
+    function setPanelMode(on) {
+      if (hdr.classList.contains('search-panel') === on) return;
+      hdr.classList.add('shape-switch');
+      hdr.classList.toggle('search-panel', on);
+      void hdr.offsetWidth;
+      /* setTimeout rather than rAF: rAF is paused in a background tab, and a
+         tab left mid-switch would come back with its transitions still off. */
+      setTimeout(function () { hdr.classList.remove('shape-switch'); }, 0);
+    }
+
+    function measureFieldShape() {
+      if (!barIsCompact()) { setPanelMode(false); return; }
+      if (hdr.classList.contains('search-panel')) {
+        if (oneRowHolds(PANEL_SLACK)) setPanelMode(false);
+      } else if (!oneRowHolds(0)) {
+        setPanelMode(true);
+      }
+    }
+
+    /* Both panels — the menu and the search field — are pinned directly under
+       the bar, so the CSS needs its height as a number. Measured rather than
+       hardcoded: the bar is 3.75rem, and a reader who has raised their default
+       font size is not on the same rem as the stylesheet's author. Reading it
+       back also forces any layout a class change has invalidated. */
+    var publishHeight = function () {
+      document.documentElement.style.setProperty(
+        '--header-h', hdr.getBoundingClientRect().height + 'px');
+    };
+
     function measure() {
+      /* A prerendered document runs its scripts before it is ever shown, against
+         a layout it will not be activated into — so nothing here is measured
+         until the document is real. default.html opts into prerendering with
+         speculation rules at eagerness "moderate". */
+      if (document.prerendering) return;
+      /* And never before the stylesheet has applied. A deferred script is not
+         guaranteed to wait for a pending one, and against unstyled markup .wrap
+         is not a flex row, there are no gutters, and .site-nav is a plain block
+         filling its parent — every number below would be wrong.
+
+         `display: flex` on .wrap comes from the stylesheet and nowhere else, so
+         it is a reliable answer to "has the CSS landed". */
+      if (window.getComputedStyle(wrap).display !== 'flex') {
+        setTimeout(measure, 50);
+        return;
+      }
+      if (scaleChanged()) forgetCachedWidths();
+      measureNav();
+      measureFieldShape();
+      publishHeight();
+    }
+
+    function measureNav() {
       /* Below the breakpoint the CSS is already collapsed and the class would
          be redundant — worse, the nav is `position: fixed` there and reports a
          viewport-wide box, which would poison the cached natural width. */
@@ -329,8 +586,16 @@
       if (!hdr.classList.contains('nav-collapsed')) {
         /* Inline: the links are laid out, so this is the one chance to learn
            how wide they really are. */
-        navWidth = Math.max(navWidth, Math.round(navEl.getBoundingClientRect().width));
-        if (!fits(MIN_GAP)) hdr.classList.add('nav-collapsed');
+        /* The latest reading, not the largest ever seen: the links are only
+           measured here, in the inline state, where the value is their natural
+           width, so the newest reading is the best one and a bad one is
+           corrected by the next. */
+        var navNow = Math.round(navEl.getBoundingClientRect().width);
+        if (navNow > 0) navWidth = navNow;
+        if (!fits(MIN_GAP)) {
+          hdr.classList.add('nav-collapsed');
+          collapsedAtRail = railWidth();
+        }
         return;
       }
 
@@ -341,7 +606,16 @@
          both directions from one number makes the header flap at the width
          where collapsing is what creates the room to expand. */
       if (!navWidth) return;
-      if (fits(MIN_GAP + HYSTERESIS)) {
+      /* transitionend on the field's width re-runs this the moment the row has
+         settled, so nothing is lost by waiting. */
+      if (fieldSettling()) return;
+      /* HYSTERESIS guards against flapping while the window is being resized, so
+         it is charged only when the rail has actually changed width since the
+         collapse. At the same width the collapse was caused by something else —
+         an open search field, which stands the links down deliberately — and
+         MIN_GAP alone decides when they come back. */
+      var railUnchanged = Math.abs(railWidth() - collapsedAtRail) < 1;
+      if (fits(railUnchanged ? MIN_GAP : MIN_GAP + HYSTERESIS)) {
         hdr.classList.remove('nav-collapsed');
         /* An open panel must not survive into the inline layout, where nothing
            would ever close it again. */
@@ -365,7 +639,8 @@
       var ro = new ResizeObserver(schedule);
       ro.observe(wrap);
       ro.observe(brand);
-      var field = hdr.querySelector('.nav-search-input');
+      /* `field` is the one declared above; the second `var` here assigns the
+         same element to the same binding. */
       if (field) ro.observe(field);
     }
     window.addEventListener('resize', schedule);
@@ -374,14 +649,41 @@
        lifecycle and is throttled in a background tab, whereas a click is not.
        Capture phase so it runs whatever the control does with the event, and
        `busy` collapses the pair into one measurement. */
-    document.addEventListener('click', schedule, true);
-    /* The field animates its width, so the final geometry only exists once the
-       transition has finished. */
+    document.addEventListener('click', function () {
+      /* Whether the field opens in the bar or as a panel is settled by the
+         width alone, so a click cannot change it. What a click can change is
+         whether the nav links still fit beside an open field, which is
+         measureNav()'s business — hence schedule() and nothing more. */
+      schedule();
+    }, true);
+    /* In the bar the field animates its width, so the geometry the links are
+       judged against only exists once that transition has finished. */
     hdr.addEventListener('transitionend', function (e) {
       if (e.propertyName === 'width') schedule();
     });
     /* A late webfont changes the wordmark's width after first layout. */
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    /* The moment a prerendered document becomes the page on screen. This is
+       the first point at which any of the measurements above mean anything. */
+    if (document.prerendering) {
+      document.addEventListener('prerenderingchange', measure, { once: true });
+    }
+    /* And back/forward: Safari restores from its cache without re-running any
+       of this, so a bar that was collapsed when the page was cached comes back
+       collapsed regardless of the width it is restored into. */
+    window.addEventListener('pageshow', function (e) { if (e.persisted) measure(); });
+    /* At `load` everything is settled — stylesheet, fonts, the avatar's box —
+       so the cache is thrown away and the measurement started from nothing
+       rather than inherited from a decision taken with less information.
+
+       While the bar is collapsed the links sit in a fixed panel and their
+       natural width is never re-read, so this is the only point that can
+       correct a cached width. The class is dropped and re-derived in the same
+       task, so nothing paints between the two states. */
+    window.addEventListener('load', function () {
+      forgetCachedWidths();
+      measure();
+    });
     measure();
   })();
 
@@ -473,11 +775,22 @@
       var lr = link.getBoundingClientRect();
       var tr = toc.getBoundingClientRect();
       var pad = 24;
+      var next = toc.scrollTop;
       if (lr.top < tr.top + pad) {
-        toc.scrollTop -= (tr.top + pad) - lr.top;
+        next -= (tr.top + pad) - lr.top;
       } else if (lr.bottom > tr.bottom - pad) {
-        toc.scrollTop += lr.bottom - (tr.bottom - pad);
+        next += lr.bottom - (tr.bottom - pad);
+      } else {
+        return;
       }
+      /* Within a padding of either end, go the whole way. The padding exists to
+         stop the active entry sitting flush against an edge; near the ends
+         there is nothing to sit flush against, and insisting on it leaves the
+         rail short of its own top or bottom. */
+      var max = toc.scrollHeight - toc.clientHeight;
+      if (next <= pad) next = 0;
+      else if (next >= max - pad) next = max;
+      toc.scrollTop = next;
     }
 
     /* Which heading is being read: the last one that has passed the reading
@@ -1087,6 +1400,45 @@
 
 
   /* ------------------------------------------------- sortable tables */
+  /* ------------------------------------------- dismissing a linked row */
+  /* Following a row's "#" leaves that row highlighted for as long as the
+     fragment is in the URL, which is right when you have just arrived on a
+     link and wrong once you have read it and moved on. A click anywhere else
+     on the page puts it away.
+
+     The highlight is CSS :target, which cannot be cancelled by script — so
+     what the click actually toggles is a class on <html> that the rule is
+     gated on, and the fragment is cleared alongside it so a reload agrees with
+     what is on screen. replaceState rather than pushState: dismissing a
+     highlight is not a place in the reader's history. */
+  if (document.querySelector('.adv-table')) {
+    var clearTarget = function () {
+      document.documentElement.classList.add('target-cleared');
+      if (location.hash) {
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    };
+    var restoreTarget = function () {
+      document.documentElement.classList.remove('target-cleared');
+    };
+
+    document.addEventListener('click', function (e) {
+      var anchor = e.target.closest && e.target.closest('.row-anchor');
+      /* Re-linking the same row fires no hashchange, since the fragment does
+         not change — so the class has to come off here as well. */
+      if (anchor) { restoreTarget(); return; }
+      if (!location.hash) return;
+      /* A click inside the highlighted row is not "away": it is following one
+         of the advisory's links, or selecting the text of it. */
+      var row = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (row && e.target.closest && e.target.closest('tr') === row) return;
+      clearTarget();
+    });
+
+    /* Arriving at a different row, by link or by Back. */
+    window.addEventListener('hashchange', restoreTarget);
+  }
+
   /* Any table carrying .adv-table becomes click-to-sort. The affordance is
      drawn in CSS from the aria-sort attribute, so the header always shows
      whether a column is sortable and which way it is currently ordered. */
@@ -1140,7 +1492,12 @@
         if (th.hasAttribute('data-nosort')) return;
         th.tabIndex = 0;
         th.setAttribute('role', 'columnheader');
-        th.setAttribute('aria-sort', 'none');
+        /* A template may declare the order the table already ships in — the
+           advisories table is sorted by CVE before it is served, so it says
+           aria-sort="ascending" on that header. Overwriting it with 'none'
+           would both misreport the state and make the first click on that
+           column re-apply the order it already has. */
+        if (!th.hasAttribute('aria-sort')) th.setAttribute('aria-sort', 'none');
         th.title = 'Sort by ' + th.textContent.trim();
 
         var sort = function () {
@@ -1161,7 +1518,13 @@
           });
 
           rows.forEach(function (r) { tbody.appendChild(r); });
-          headers.forEach(function (h) { h.setAttribute('aria-sort', 'none'); });
+          /* Clear the other headers' state — but not a column that opted out of
+             sorting, which must never be handed an `aria-sort`. The CSS draws
+             the sort arrow from that attribute, and the extra glyph would both
+             misreport the column and change its width. */
+          headers.forEach(function (h) {
+            if (!h.hasAttribute('data-nosort')) h.setAttribute('aria-sort', 'none');
+          });
           th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
         };
 
@@ -1223,33 +1586,6 @@
   }
   wireCards();   // search results call this again for the cards they inject
 
-  /* --------------------------------------------------------------- 404 cat */
-  /* Jekyll renders one cat server-side so the page works without JS; this
-     reshuffles on each visit so it is not the same one every time. */
-  var catData = document.getElementById('cat-data');
-  var catImg = document.getElementById('cat-img');
-  if (catData && catImg) {
-    try {
-      var paths = JSON.parse(catData.textContent);
-      if (paths.length > 1) {
-        var pick = paths[Math.floor(Math.random() * paths.length)];
-        // Only swap once it has actually decoded, so a missing file leaves the
-        // server-rendered one in place rather than showing a broken image.
-        var pre = new Image();
-        pre.onload = function () {
-          catImg.src = pick;
-          var nameEl = document.getElementById('cat-name');
-          if (nameEl) {
-            var base = pick.split('/').pop().replace(/\.[^.]+$/, '');
-            base = base.replace(/[-_]+/g, ' ');
-            nameEl.textContent = base.charAt(0).toUpperCase() + base.slice(1);
-          }
-        };
-        pre.src = pick;
-      }
-    } catch (e) {}
-  }
-
   /* ------------------------------------------------- header search expander */
   /* The form is a plain GET to /search/, so submitting works without any of
      this. All that happens here is the collapse/expand. */
@@ -1269,6 +1605,21 @@
       if (header) header.classList.toggle('search-open', open);
       navToggle.setAttribute('aria-expanded', String(open));
       if (open) navInput.focus();
+      /* The other half of the bargain struck by the menu button. */
+      if (open && panelMode() && nav && nav.classList.contains('open')) {
+        nav.classList.remove('open');
+        if (navBtn) navBtn.setAttribute('aria-expanded', 'false');
+      }
+    };
+
+    /* Only while the field is a panel. Wider, it opens inside the bar and the
+       two never share a pixel, so closing one to open the other would be the
+       surprise the click-away rule below is written to avoid. */
+    var panelMode = function () {
+      return !!header && header.classList.contains('search-panel');
+    };
+    closeSearchPanel = function () {
+      if (panelMode() && navSearch.classList.contains('open')) setOpen(false);
     };
 
     navToggle.addEventListener('click', function () {
@@ -1300,8 +1651,12 @@
       if (!navInput.value.trim()) setOpen(false);
     });
 
-    // On /search/ the page has its own field; no reason to offer two.
-    if (document.getElementById('q')) navSearch.hidden = true;
+    /* The header keeps its search on /search/ too: it is the one control a
+       reader expects in the same place on every page.
+
+       The two do not collide. `/` goes to the page's own field, which is the
+       larger target and the one with results under it, and submitting the
+       header form lands on /search/?q=… which this page reads on load. */
   }
 
   /* ------------------------------------------------------- "/" opens search */
@@ -2274,7 +2629,15 @@
       var hits = docs
         .map(function (d) { return { doc: d, s: score(d, terms) }; })
         .filter(function (h) { return h.s > 0; })
-        .sort(function (a, b) { return b.s - a.s; });
+        .sort(function (a, b) {
+          if (b.s !== a.s) return b.s - a.s;
+          /* Level on score, a write-up beats a section page. A page's body is
+             mostly the list it generates, so it can match a term as strongly
+             as the post it is listing — and the post is the thing being looked
+             for. */
+          var ap = a.doc.kind === 'page', bp = b.doc.kind === 'page';
+          return ap === bp ? 0 : (ap ? 1 : -1);
+        });
 
       status.textContent = hits.length
         ? hits.length + (hits.length === 1 ? ' result' : ' results')
@@ -2284,12 +2647,17 @@
         var d = h.doc;
         var li = document.createElement('li');
         li.className = 'post-item';
+        /* A page has no date and no tags. Left to the post layout it rendered
+           an empty <time> reading "undefined"; it says what it is instead, so
+           a section page in a list of write-ups is recognisable as one. */
+        var meta = d.date
+          ? '<time datetime="' + esc(d.iso) + '">' + esc(d.date) + '</time>' +
+            ((d.tags && d.tags.length)
+              ? '<span aria-hidden="true">&middot;</span><span>' + esc(d.tags.slice(0, 3).join(', ')) + '</span>'
+              : '')
+          : '<span>Page</span>';
         li.innerHTML =
-          '<div class="meta"><time datetime="' + esc(d.iso) + '">' + esc(d.date) + '</time>' +
-          ((d.tags && d.tags.length)
-            ? '<span aria-hidden="true">&middot;</span><span>' + esc(d.tags.slice(0, 3).join(', ')) + '</span>'
-            : '') +
-          '</div>' +
+          '<div class="meta">' + meta + '</div>' +
           '<h3><a href="' + esc(d.url) + '">' + esc(d.title) + '</a></h3>' +
           '<div class="excerpt"><p>' + snippet(d, terms) + '</p></div>';
         results.appendChild(li);
@@ -2819,12 +3187,30 @@
   /* ---------------------------------------------------- reading progress */
   var bar = document.getElementById('progress');
   if (bar && body) {
+    /* The bar starts at zero width and transitions, so the very first update
+       animates from 0 to wherever the reader already is. Refresh a post you
+       were halfway through and the bar sweeps across the top on its own — an
+       animation nobody asked for, reporting progress that had not just been
+       made. Every update after it is a real change and should glide.
+
+       Suppressed inline for one write, with a reflow between, so the value is
+       committed while the transition is off. */
+    var barPlaced = false;
+    var setWidth = function (w) {
+      if (barPlaced) { bar.style.width = w; return; }
+      var prev = bar.style.transition;
+      bar.style.transition = 'none';
+      bar.style.width = w;
+      void bar.offsetWidth;
+      bar.style.transition = prev;
+      barPlaced = true;
+    };
     var update = function () {
       var rect = body.getBoundingClientRect();
       var total = rect.height - window.innerHeight;
-      if (total <= 0) { bar.style.width = '0'; return; }
+      if (total <= 0) { setWidth('0'); return; }
       var pct = ((-rect.top) / total) * 100;
-      bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+      setWidth(Math.min(100, Math.max(0, pct)) + '%');
     };
 
     var ticking = false;

@@ -5,48 +5,14 @@ title: "gkarchemsky's blog"
 ---
 <div class="wrap">
 
-  {%- comment -%}
-    Name and links. The role line lives on /about/ instead — the icons stay
-    because this is the only place they appear above the fold.
-  {%- endcomment -%}
-  {%- comment -%}
-    The name and icon row sit above the split, full width, the same way
-    .page-head does on every other page. The two-column shell — content beside
-    the archive — starts below the rule, so the rail lines up with the first
-    real content rather than with the wordmark.
-  {%- endcomment -%}
   <section class="intro">
-    {%- comment -%}
-      The person, not the handle. The wordmark in the header already reads
-      "> gkarchemsky" a few pixels above this, and the browser tab says
-      "gkarchemsky's blog" — so repeating the handle here would be the third
-      time on one screen, and it is the one place with room to say who writes
-      the thing. site.title carries the blog's name; this carries the author's.
-    {%- endcomment -%}
     <h1>{{ site.author.name }}</h1>
 
-    {%- comment -%}
-      What the work is, rather than a job title. The browser tab and every
-      search result already carry the name; this is the line that tells someone
-      who has just landed whether the blog is for them.
-    {%- endcomment -%}
     <p class="intro-tagline">Reverse Engineering, Vulnerability Research and Exploit Development</p>
 
     {%- include social.html size="lg" -%}
   </section>
 
-
-  {%- comment -%}
-    CTF write-ups share the post stream, the feed and /blog/ with everything
-    else — but the featured slot is reserved for research, so a run of weekend
-    competition posts cannot push a CVE write-up off the top of the site.
-    With no research posts yet published it falls back to the newest post.
-  {%- endcomment -%}
-  {%- comment -%}
-    The featured slot is simply the newest post, whatever kind it is — a CTF
-    write-up can take the top of the page. Anything cleverer makes the label a
-    lie.
-  {%- endcomment -%}
   {%- assign blog_posts = "" | split: "" -%}
   {%- assign ctf_posts = "" | split: "" -%}
   {%- for p in site.posts -%}
@@ -57,29 +23,16 @@ title: "gkarchemsky's blog"
     {%- endif -%}
   {%- endfor -%}
 
-  {%- comment -%}
-    Three under each featured card. Two columns of four made the page taller
-    than the single merged list it replaced, which defeats the point.
-  {%- endcomment -%}
-  {%- assign col_limit = 3 -%}
+  {%- assign col_limit = 4 -%}
   {%- assign ctf_home_page = site.pages | where: "url", "/ctf/" | first -%}
 
   <div class="home-streams">
 
-    {%- comment -%} ---------- left: research ---------- {%- endcomment -%}
     <section class="stream" aria-labelledby="blog-h">
       {%- assign lead = blog_posts.first -%}
       <div class="featured-wrap">
         <h2 id="blog-h" class="featured-label">Latest blog post</h2>
         {%- if blog_posts.size == 0 -%}
-        {%- comment -%}
-          The same .featured card, not a different box. A bare .empty note
-          sat where the card would be with a dashed hairline, no fill and no
-          radius — so the slot a reader is being told about looked nothing
-          like the thing that will fill it. Reusing the card guarantees the
-          geometry matches by construction; `is-empty` only softens the
-          border to dashed and centres the note.
-        {%- endcomment -%}
         <article class="featured is-empty">
           <p>No posts published yet &mdash; the first one is in progress.</p>
         </article>
@@ -120,39 +73,18 @@ title: "gkarchemsky's blog"
       {%- endif %}
 
       <p class="stream-more">
-        {%- comment -%}
-          Just the destination. A count ("1 more post") makes the button about
-          the arithmetic rather than about where it goes, and reads oddly at
-          small numbers.
-        {%- endcomment -%}
         <a class="btn" href="{{ '/blog/' | relative_url }}">
           All blog posts <span class="arrow" aria-hidden="true">&rarr;</span>
         </a>
       </p>
     </section>
 
-    {%- comment -%} ---------- right: CTF write-ups ---------- {%- endcomment -%}
-    {%- comment -%}
-      Gated on the /ctf/ page existing, not on there being write-ups — the
-      column is what tells a reader the section exists. It also un-orphans the
-      page: with no write-ups the nav link hides itself, and without this
-      column nothing on the site linked to /ctf/ while the sitemap still
-      listed it.
-    {%- endcomment -%}
     {%- if ctf_home_page %}
     <section class="stream" aria-labelledby="ctf-h">
       {%- assign lead = ctf_posts.first -%}
       <div class="featured-wrap">
         <h2 id="ctf-h" class="featured-label">Latest CTF write-up</h2>
         {%- if ctf_posts.size == 0 -%}
-        {%- comment -%}
-          The same .featured card, not a different box. A bare .empty note
-          sat where the card would be with a dashed hairline, no fill and no
-          radius — so the slot a reader is being told about looked nothing
-          like the thing that will fill it. Reusing the card guarantees the
-          geometry matches by construction; `is-empty` only softens the
-          border to dashed and centres the note.
-        {%- endcomment -%}
         <article class="featured is-empty">
           <p>No write-ups published yet &mdash; the first one is in progress.</p>
         </article>

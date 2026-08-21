@@ -1,25 +1,5 @@
-{%- comment -%}
-Social icon row. Every entry is skipped unless its value is set in
-_config.yml -> social:.
-
-  include social.html size="lg"   -> larger icons (home page)
-
-Logos are inline SVG on a 24x24 viewBox so they share one sizing rule.
-{%- endcomment -%}
 {%- assign s = site.social -%}
-{%- comment -%}
-  The address lives in contact.email; social.email only exists to override it
-  if you ever want a different one shown as an icon.
-{%- endcomment -%}
 {%- assign email = s.email | default: site.contact.email -%}
-{%- comment -%}
-  The row is captured rather than written straight out so the icons can be
-  counted. main.css keeps the row on a single line at every width by spending
-  whatever space is left over on the gaps, and to work that out it needs to
-  know how many icons there are. Counting the captured markup instead of
-  repeating the conditions above means switching a network on or off in
-  _config.yml keeps the count right on its own.
-{%- endcomment -%}
 {%- capture icons -%}
 
   {%- if s.linkedin and s.linkedin != "" %}
@@ -48,7 +28,9 @@ Logos are inline SVG on a 24x24 viewBox so they share one sizing rule.
 
   {%- if s.mastodon and s.mastodon != "" %}
   <li><a href="{{ s.mastodon }}" rel="me noopener" title="Mastodon" aria-label="Mastodon">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.19 7.12c-.36-2.66-2.68-4.75-5.44-5.16C17.29 1.89 15.53 1.64 11.46 1.64h-.03c-4.07 0-4.95.25-5.42.32C3.33 2.36 1.14 4.24.61 6.93.36 8.26.33 9.73.38 11.08c.07 1.94.08 3.87.26 5.8.12 1.28.34 2.55.65 3.79.59 2.29 2.85 4.19 5.07 4.97 2.39.82 4.95.95 7.4.39.27-.07.54-.14.8-.23.6-.19 1.29-.4 1.8-.77a.06.06 0 0 0 .03-.05v-1.86a.05.05 0 0 0-.02-.04.06.06 0 0 0-.05-.01 20.7 20.7 0 0 1-4.8.56c-2.78 0-3.53-1.32-3.74-1.87a5.77 5.77 0 0 1-.33-1.47.05.05 0 0 1 .02-.05.06.06 0 0 1 .05 0c1.56.37 3.16.56 4.77.56.39 0 .77 0 1.16-.01 1.62-.05 3.32-.13 4.91-.44l.11-.02c2.51-.48 4.9-1.99 5.14-5.82.01-.15.03-1.58.03-1.73 0-.54.17-3.81-.03-5.82Zm-3.5 9.65h-2.44v-5.96c0-1.25-.53-1.89-1.6-1.89-1.17 0-1.76.76-1.76 2.26v3.28h-2.42v-3.28c0-1.5-.59-2.26-1.76-2.26-1.06 0-1.6.64-1.6 1.89v5.96H5.66v-6.14c0-1.25.32-2.25.96-2.98.66-.74 1.52-1.11 2.6-1.11 1.24 0 2.18.48 2.81 1.43l.6 1.01.61-1.01c.62-.95 1.57-1.43 2.81-1.43 1.07 0 1.94.37 2.6 1.11.64.73.96 1.73.96 2.98v6.14Z"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g transform="translate(0.807, -1.025) scale(0.93)"><path d="M23.19 7.12c-.36-2.66-2.68-4.75-5.44-5.16C17.29 1.89 15.53 1.64 11.46 1.64h-.03c-4.07 0-4.95.25-5.42.32C3.33 2.36 1.14 4.24.61 6.93.36 8.26.33 9.73.38 11.08c.07 1.94.08 3.87.26 5.8.12 1.28.34 2.55.65 3.79.59 2.29 2.85 4.19 5.07 4.97 2.39.82 4.95.95 7.4.39.27-.07.54-.14.8-.23.6-.19 1.29-.4 1.8-.77a.06.06 0 0 0 .03-.05v-1.86a.05.05 0 0 0-.02-.04.06.06 0 0 0-.05-.01 20.7 20.7 0 0 1-4.8.56c-2.78 0-3.53-1.32-3.74-1.87a5.77 5.77 0 0 1-.33-1.47.05.05 0 0 1 .02-.05.06.06 0 0 1 .05 0c1.56.37 3.16.56 4.77.56.39 0 .77 0 1.16-.01 1.62-.05 3.32-.13 4.91-.44l.11-.02c2.51-.48 4.9-1.99 5.14-5.82.01-.15.03-1.58.03-1.73 0-.54.17-3.81-.03-5.82Zm-3.5 9.65h-2.44v-5.96c0-1.25-.53-1.89-1.6-1.89-1.17 0-1.76.76-1.76 2.26v3.28h-2.42v-3.28c0-1.5-.59-2.26-1.76-2.26-1.06 0-1.6.64-1.6 1.89v5.96H5.66v-6.14c0-1.25.32-2.25.96-2.98.66-.74 1.52-1.11 2.6-1.11 1.24 0 2.18.48 2.81 1.43l.6 1.01.61-1.01c.62-.95 1.57-1.43 2.81-1.43 1.07 0 1.94.37 2.6 1.11.64.73.96 1.73.96 2.98v6.14Z"/></g>
+    </svg>
   </a></li>
   {%- endif %}
 

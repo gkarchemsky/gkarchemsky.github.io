@@ -1,59 +1,14 @@
-{%- comment -%}
-  giscus — comments stored as GitHub Discussions.
 
-  Renders nothing until `comments.repo_id` and `comments.category_id` are set in
-  _config.yml, so the site is safe to deploy before any of it is configured. A
-  post can opt out with `comments: false` in its front matter.
-
-  How it works, in short: the script below injects an iframe from giscus.app.
-  That iframe asks the giscus backend for the Discussion matching this page
-  (matched on pathname, per `data-mapping`), renders it, and posts back its
-  height. No Discussion is created until somebody actually comments — pages with
-  no comments cost one request and show an empty box.
-
-  Nothing here can post on your behalf: giscus is a GitHub *App*, scoped to the
-  repositories it is installed on. (utterances, the older alternative, is an
-  OAuth App that asks each commenter for the `public_repo` scope — write access
-  to every public repository they own. That difference is the reason to prefer
-  giscus.)
-{%- endcomment -%}
-
-{%- comment -%}
-  This block owns the whole "respond" region: the invitation, the mechanics of
-  the comment box, and the private channel.
-
-  Three lines, in the order a reader needs them:
-    1. what to send      — the invitation, and it is the same on every post
-    2. how the box works — a GitHub account is required, so say it before the
-                           box appears rather than after they try to type
-    3. the way out       — for anything that should not be public
-{%- endcomment -%}
 {%- assign c = site.comments -%}
 {%- if c and c.repo_id and c.repo_id != "" and c.category_id and c.category_id != "" and page.comments != false %}
 <section class="comments" aria-labelledby="comments-h">
   <h2 class="comments-title" id="comments-h">Comments</h2>
-  {%- comment -%}
-    One paragraph, broken with a <br>: these two sentences are a single
-    invitation — here is where to send it, and here is where to send the parts
-    that should not be public. A paragraph break between them would open a
-    margin and make them read as unrelated notices.
-  {%- endcomment -%}
   <p class="comments-note">
     Questions, corrections, or anything I got wrong &mdash; leave them here, or
     <a href="{{ '/about/#contact' | relative_url }}">get in touch</a>.<br>
     For anything sensitive, use the
     <a href="{{ '/about/#contact' | relative_url }}">PGP key</a> instead.
   </p>
-  {%- comment -%}
-    The giscus script is injected by site.js rather than written out here, so
-    that `data-theme` can be set from the theme the site is *actually* showing.
-    Hardcoding `preferred_color_scheme` asks the OS instead, which is wrong
-    whenever the theme toggle disagrees with it — a dark page would load a
-    white comment box.
-
-    site.js also keeps the injection lazy, so nothing is fetched from giscus.app
-    until a reader scrolls this far.
-  {%- endcomment -%}
   <div id="giscus"
        data-repo="{{ c.repo }}"
        data-repo-id="{{ c.repo_id }}"
@@ -62,11 +17,6 @@
        data-mapping="{{ c.mapping | default: 'pathname' }}"
        data-reactions="{{ c.reactions | default: 1 }}"></div>
 
-  {%- comment -%}
-    Below the box, not above it: this is attribution and mechanics, not an
-    instruction the reader needs before they start. The invitation goes first,
-    the box next, and the small print about who hosts it last.
-  {%- endcomment -%}
   <p class="comments-note comments-colophon">
     Hosted on <a href="https://giscus.app" rel="noopener">giscus</a> and stored as
     GitHub Discussions &mdash; commenting needs a GitHub account.
@@ -79,11 +29,6 @@
   </noscript>
 </section>
 {%- else -%}
-{%- comment -%}
-  Comments off for this post, or giscus not configured yet. The invitation is
-  the part that must not disappear with them — a post with no way to respond to
-  it reads as a broadcast.
-{%- endcomment -%}
 <p class="post-signoff">
   Questions, corrections, or anything I got wrong &mdash;
   <a href="{{ '/about/#contact' | relative_url }}">get in touch</a>.

@@ -2,55 +2,85 @@
 layout: default
 permalink: /404.html
 title: "404"
-description: That page does not exist — here is the way back to the write-ups.
+description: Sorry — that page could not be found. Here is the way back.
 sitemap: false
 ---
-{%- comment -%}
-  GitHub Pages serves this for any unmatched path on the custom domain.
-
-  Cats are read from assets/img/cats/ at build time — drop a file in, it joins
-  the rotation, nothing here needs editing. Jekyll renders one server-side so
-  the page works without JavaScript; site.js then reshuffles on each visit so
-  it is not the same cat every time.
-
-  With the folder empty the whole block is skipped and the page still reads
-  correctly.
-{%- endcomment -%}
 {%- assign cats = site.static_files
       | where_exp: "f", "f.path contains '/assets/img/cats/'"
       | where_exp: "f", "f.extname != '.md'" -%}
 
 <div class="wrap">
   <section class="fourohfour">
+    {%- comment -%}
+      Plain on purpose. This said "Segmentation fault" and blamed a stray
+      pointer, which is a memory-safety fault in a running process and has
+      nothing to do with a server having no resource at a path. On a site about
+      exactly that vocabulary, using it loosely for a joke costs more than the
+      joke returns.
+
+      The register is Amazon's dog page: apologise in ordinary words, say what
+      happened, point at the way out, and let the animal carry the charm. Copy
+      that competes with the photo loses to it.
+    {%- endcomment -%}
     <p class="eyebrow-404">Error 404</p>
-    <h1>Segmentation fault</h1>
+    <h1>Sorry, I can&rsquo;t find that page</h1>
     <p class="lede-404">
-      That page doesn&rsquo;t exist. Somewhere a pointer went somewhere it
-      shouldn&rsquo;t have &mdash; on this occasion, harmlessly.
+      The link may be broken, or the page may have moved. Everything on the
+      site is still reachable from the front page.
     </p>
 
     {%- if cats.size > 0 -%}
-      {%- comment -%} Seed the server-side pick from the build time. {%- endcomment -%}
       {%- assign seed = site.time | date: '%s' | modulo: cats.size -%}
       {%- assign cat = cats[seed] -%}
       {%- assign cat_name = cat.basename | replace: '-', ' ' | replace: '_', ' ' | capitalize -%}
 
+      {%- comment -%}
+        The list comes first so the picker below has it, and the picker runs
+        inline, immediately after the figure, rather than from the deferred
+        site.js.
+
+        Deferred is too late. site.js runs after the document has parsed, so
+        the server-rendered cat and its name were already on screen when the
+        swap happened — every reload showed one cat, then flipped to another,
+        caption and all. Inline here the swap lands during parsing, before
+        anything is painted, and the reader sees one cat.
+      {%- endcomment -%}
+      <script id="cat-data" type="application/json">{{ cats | map: "path" | jsonify }}</script>
+
       <figure class="cat" id="cat-figure">
         <img id="cat-img" src="{{ cat.path | relative_url }}"
              alt="One of the cats" decoding="async">
-        <figcaption id="cat-name">{{ cat_name }}</figcaption>
+        <figcaption>
+          <span id="cat-name">{{ cat_name }}</span>
+          {%- comment -%}
+            The name on its own leaves a stranger wondering why there is a cat
+            on an error page, so this says so. It picks up the h1 rather than
+            repeating it — "Sorry, I can't find that page" ... "but here's a
+            photo of a cat" is one sentence with the photo in the middle of it.
+          {%- endcomment -%}
+          <span class="cat-note">But here&rsquo;s a photo of a cat instead.</span>
+        </figcaption>
       </figure>
 
-      <script id="cat-data" type="application/json">
-        {{ cats | map: "path" | jsonify }}
+      <script>
+        /* Jekyll picks one at build time, so without this every visitor sees
+           the same cat until the next deploy. */
+        (function () {
+          try {
+            var paths = JSON.parse(document.getElementById('cat-data').textContent);
+            if (paths.length < 2) return;
+            var img = document.getElementById('cat-img');
+            var pick = paths[Math.floor(Math.random() * paths.length)];
+            if (!pick || pick === img.getAttribute('src')) return;
+            img.src = pick;
+            var name = pick.split('/').pop().replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+            document.getElementById('cat-name').textContent =
+              name.charAt(0).toUpperCase() + name.slice(1);
+          } catch (e) {}
+        })();
       </script>
     {%- endif -%}
 
-    {%- comment -%}
-      One way out, not two. A 404 is a dead end and the reader's only real
-      question is "where do I start again" — offering a second destination
-      beside the answer makes them choose instead of just leaving.
-    {%- endcomment -%}
     <p class="back-404">
       <a class="btn" href="{{ '/' | relative_url }}">
         <span class="arrow" aria-hidden="true">&larr;</span> Back home

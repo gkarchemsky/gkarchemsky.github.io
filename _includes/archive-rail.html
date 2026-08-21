@@ -1,34 +1,4 @@
-{%- comment -%}
-  Every post, grouped by year, in a sticky rail.
 
-  The reason this exists: /blog/ pages at 10, so from the 11th post onward the
-  older ones are reachable only by paging, searching, or guessing a tag. That is
-  fine at 6 posts and hostile at 50 — the reader who half-remembers a post about
-  one decoder has no way to scan for it. Project Zero solves this with exactly
-  this component, and it is the single cheapest navigation win a research blog
-  has: the whole archive, one click from anywhere, no query to compose.
-
-  Complete on purpose — no pagination, no "show more". A list of titles is a few
-  bytes each, and the value is precisely that nothing is hidden.
-
-  The current year is open; older years collapse into <details>, so the rail
-  stays scannable as the archive grows. `open` on the first group is set by
-  forloop.first rather than by comparing to "now", so a year with no posts yet
-  does not open an empty group in January.
-
-  Usage:  {% include archive-rail.html %}   inside a .page-shell
-{%- endcomment -%}
-
-{%- comment -%}
-  `posts` scopes the rail to a subset — /blog/ passes everything that is not a
-  CTF write-up, /ctf/ passes only the CTF ones, the home page passes nothing
-  and gets all of them.
-
-  Not `include.posts | default: site.posts`: Liquid's `default` treats an empty
-  array as empty and would silently swap in the full list, so a section with no
-  posts yet would show every post in the site. An explicit test is the only
-  safe form here.
-{%- endcomment -%}
 {%- if include.posts -%}
   {%- assign rail_posts = include.posts -%}
 {%- else -%}
@@ -38,11 +8,6 @@
 
 {%- if posts_by_year.size > 0 %}
 <nav class="archive-rail" aria-labelledby="archive-h">
-  {%- comment -%}
-    Above the archive rather than in the page's lede: this is where a reader
-    who has decided to follow the blog is already looking, and it sits on
-    every page the rail appears on instead of only /blog/.
-  {%- endcomment -%}
   <p class="archive-title" id="archive-h">Archive</p>
 
   {%- for year in posts_by_year %}
@@ -53,11 +18,6 @@
     </summary>
     <ul>
       {%- for post in year.items %}
-      {%- comment -%}
-        aria-current goes on the <a>, not the <li>. It is valid on any element
-        but support outside links is patchy, and the site nav already puts it
-        on the link — one convention, not two.
-      {%- endcomment -%}
       <li>
         <a href="{{ post.url | relative_url }}"{% if post.url == page.url %} aria-current="page"{% endif %}>
           <span class="d">{{ post.date | date: "%b %-d" }}</span>

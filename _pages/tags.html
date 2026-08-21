@@ -5,7 +5,7 @@
 layout: default
 title: Tags
 permalink: /tags/
-description: Posts grouped by topic — kernel, sandbox, exploitation, and more.
+description: Every post on the site, grouped by topic and filterable by tag.
 ---
 <div class="wrap">
   <header class="page-head">
@@ -15,36 +15,6 @@ description: Posts grouped by topic — kernel, sandbox, exploitation, and more.
 
   {%- assign tags = site.tags | sort -%}
 
-  {%- comment -%}
-    Tags that carry their own colour lead the row, the rest follow in
-    alphabetical order.
-
-    `ctf` is green everywhere on the site — in this cloud, under every post
-    title, on the home page cards and in the command palette — because a
-    write-up is a different kind of thing from a research post, not just
-    another topic. Sorting it purely alphabetically buried that distinction
-    between two ordinary topics, where the one chip that means something
-    structural read as noise.
-
-    Written as a list rather than a hardcoded `ctf` so a second accent tag is
-    one word here plus its colour rule in main.css. Kept in step with the
-    `[data-tag="..."]` selectors there — that is the other half of this, and
-    a tag named here without a rule there just sorts first for no visible
-    reason.
-
-    Partitioned with a loop because Liquid cannot negate `contains`: the
-    negated form of `where_exp` parses and then matches nothing, so the
-    "everything else" half has to be built by hand. Same reason index.html
-    splits the two post streams the way it does.
-
-    The lists hold tag *names*, not the [name, posts] pairs `site.tags | sort`
-    yields. Pushing those pairs through `push` and `concat` does not survive:
-    the pair comes back out as a Drop rather than an array, `t[0]` then raises
-    "0 is not a symbol nor a string", and the page fails to build at all — with
-    `jekyll serve` quietly continuing to hand out the last good copy, so the
-    edit simply appears to do nothing. Strings survive both filters, and the
-    post list is looked up again below.
-  {%- endcomment -%}
   {%- assign accent_tags = "ctf" | split: "," -%}
   {%- assign lead_names = "" | split: "" -%}
   {%- assign rest_names = "" | split: "" -%}
@@ -59,20 +29,6 @@ description: Posts grouped by topic — kernel, sandbox, exploitation, and more.
   {%- assign ordered_names = lead_names | concat: rest_names -%}
 
   {%- if tags.size > 0 -%}
-  {%- comment -%}
-    One list of everything, narrowed in place by the chips above it, rather
-    than a section per tag.
-
-    The old shape repeated a post once per tag it carried — a post with five
-    tags appeared five times on the page, and finding "the one that was
-    also about heap corruption" meant reading two lists and intersecting them
-    by eye. Selecting tags is the operation people actually want, and it is the
-    one thing a per-tag layout cannot do.
-
-    Everything is rendered server-side and visible by default, so with no
-    JavaScript this is still a complete, readable archive — it just cannot be
-    filtered. site.js selects `[data-tags]` and hides the rest.
-  {%- endcomment -%}
   <div class="tag-filter" id="tag-filter">
     <ul class="tag-cloud" role="group" aria-label="Filter by tag">
       {%- for name in ordered_names %}
@@ -84,12 +40,6 @@ description: Posts grouped by topic — kernel, sandbox, exploitation, and more.
       {%- endfor %}
     </ul>
 
-    {%- comment -%}
-      role="status" so the result count is announced when it changes. Without
-      it the filter was silent to a screen reader: chips toggled aria-pressed,
-      rows vanished, and nothing said how many were left. /search/ already
-      does this correctly and this matches it.
-    {%- endcomment -%}
     <p class="tag-status" id="tag-status" role="status" aria-live="polite" hidden>
       <span id="tag-status-text"></span>
       <button type="button" class="tag-clear" id="tag-clear">Clear</button>
@@ -99,25 +49,10 @@ description: Posts grouped by topic — kernel, sandbox, exploitation, and more.
   <ul class="tag-posts" id="tag-posts">
     {%- for post in site.posts %}
     <li class="tag-post" data-tags="{% for t in post.tags %}{{ t | slugify }} {% endfor %}">
-      {%- comment -%}
-        No "· CTF" label here, unlike /blog/ and the home page. On this page
-        every row already prints its own tags directly underneath, and `ctf`
-        among them is green — so the label was the same fact, in the same
-        colour, two lines above itself. The lists that carry no tags keep the
-        label, because there it is the only thing distinguishing a write-up
-        from a research post.
-      {%- endcomment -%}
       <div class="meta">
         <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: site.date_format }}</time>
       </div>
       <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
-      {%- comment -%}
-        A <button>, not a <span>. These carry a click handler that toggles the
-        same filter as the chips above — so as a span they were a control that
-        no keyboard or screen reader could reach or even see, while the chips
-        doing the identical job were proper buttons. aria-pressed is kept in
-        sync by the same code that maintains the chips.
-      {%- endcomment -%}
       {%- if post.tags and post.tags.size > 0 %}
       <ul class="tag-post-tags">
         {%- for t in post.tags %}

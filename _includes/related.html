@@ -2,20 +2,12 @@
 {%- assign max = include.limit | default: 3 -%}
 {%- assign scored = "" | split: "" -%}
 
-{%- comment -%}
-  Same stream only: a CTF write-up suggests write-ups, a research post suggests
-  research posts. The two are separated everywhere else on the site — /blog/
-  excludes CTF, /ctf/ has its own list, archive and feed — and recommending
-  across the divide sent a reader who came for kernel exploitation to a weekend
-  challenge, on the strength of a shared "pwn" tag.
-{%- endcomment -%}
 {%- assign page_is_ctf = false -%}
 {%- if page.categories contains 'ctf' %}{% assign page_is_ctf = true %}{% endif -%}
 
 {%- for candidate in site.posts -%}
   {%- assign skip = false -%}
   {%- if candidate.url == page.url -%}{%- assign skip = true -%}{%- endif -%}
-  {%- comment -%} The series banner covers these — see above. {%- endcomment -%}
   {%- if page.series and candidate.series == page.series -%}{%- assign skip = true -%}{%- endif -%}
   {%- assign cand_is_ctf = false -%}
   {%- if candidate.categories contains 'ctf' %}{% assign cand_is_ctf = true %}{% endif -%}
@@ -28,17 +20,7 @@
     {%- endfor -%}
 
     {%- if shared > 0 -%}
-      {%- comment -%}
-        Pack score and date into a sortable string — Liquid cannot sort by a
-        computed key, and this avoids a second pass over the list.
-      {%- endcomment -%}
       {%- assign key = shared | prepend: "000" | slice: -3, 3 -%}
-      {%- comment -%}
-        Fixed width, for the reason spelled out below: Liquid sorts these rows
-        as strings. `%s` is an epoch integer and happens to be 10 digits for
-        every plausible post date, but this is the array whose sort decides
-        *which* posts appear, so it is the last place to rely on that.
-      {%- endcomment -%}
       {%- assign stamp = candidate.date | date: "%Y%m%d%H%M%S" -%}
       {%- assign row = key | append: "|" | append: stamp | append: "|" | append: candidate.url -%}
       {%- assign scored = scored | push: row -%}
@@ -63,9 +45,6 @@
 {%- assign chosen = chosen | sort | reverse -%}
 
 <nav class="related" aria-labelledby="related-h">
-  {%- comment -%}
-    Named for the stream, matching the pager below it.
-  {%- endcomment -%}
   <p class="related-title" id="related-h">
     {%- if page_is_ctf %}Related write-ups{% else %}Related posts{% endif -%}
   </p>

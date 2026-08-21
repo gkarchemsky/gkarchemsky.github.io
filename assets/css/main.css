@@ -42,6 +42,25 @@
      Dark appearance uses the standard variants; every one clears WCAG AA as
      text on --bg-elev (cyan 10.4:1, green 9.0:1, orange 8.2:1, red 5.3:1,
      purple 5.0:1). */
+  /* Post rows carry a surface at rest, not only on hover — without one they
+     read as loose text on the page background and the eye has nothing to
+     separate one entry from the next.
+
+     Same blue-grey as everything else, only lifted. The resting step is
+     deliberately small: enough to bound the entry, not enough to compete with
+     the writing. Hover then has somewhere to go — a deeper fill, the full
+     border weight, and a shadow. */
+  --card-rest-bg: #101319;
+  --card-rest-border: #272f3b;
+  --card-hover-bg: #171c24;
+  /* Border and shadow are deliberately NOT repeated in the light blocks
+     below. color-mix substitutes at computed-value time, so var(--accent) and
+     var(--border) inside resolve against whichever theme is in force — one
+     definition covers both, and the treatment cannot drift apart between
+     them. Only the fill, which is a literal colour, is per-theme. */
+  --card-hover-border: color-mix(in srgb, var(--accent) 60%, var(--border));
+  --card-hover-shadow: 0 8px 26px -18px color-mix(in srgb, var(--accent) 70%, transparent);
+
   --accent: #3cd3fe;                     /* systemCyan, dark            */
   --accent-dim: #00c0e8;                 /* systemCyan, light — pressed */
   --accent-bg: rgba(60, 211, 254, 0.1);
@@ -67,6 +86,9 @@
   /* Light appearance uses Apple's *high-contrast* variants. The standard ones
      are tuned for fills and fail as text on white — systemCyan is 2.16:1 and
      systemGreen 2.22:1. The high-contrast set clears AA (4.5:1+). */
+  --card-rest-bg: #fafbfc;
+  --card-rest-border: #e3e8ee;
+  --card-hover-bg: #f1f4f8;
   --accent: #007eae;                     /* systemCyan HC    4.57:1 */
   --accent-dim: #00658b;                 /* derived: accent darkened for press */
   --accent-bg: rgba(0, 126, 174, 0.08);
@@ -94,6 +116,9 @@
     --text-strong: #0d1117;
     --text-muted: #5b6672;
     --text-faint: #6b7280;   /* 4.8:1 on white; #8994a1 was 3.1:1 */
+    --card-rest-bg: #fafbfc;
+    --card-rest-border: #e3e8ee;
+    --card-hover-bg: #f1f4f8;
     --accent: #007eae;
     --accent-dim: #00658b;
     --accent-bg: rgba(0, 126, 174, 0.08);
@@ -118,12 +143,54 @@
 
 html {
   -webkit-text-size-adjust: 100%;
-  scroll-behavior: smooth;
+  /* No `scroll-behavior: smooth` here, deliberately.
+     
+     It governs exactly two things, because every programmatic scroll in
+     site.js names its own behavior: plain `<a href="#…">` links, and scrolls
+     the *browser* performs — of which restoring your position after a refresh
+     is one. Animating that is the bug: refresh a page you had scrolled down
+     and it starts at the top and slides to where you were, dragging the layout
+     past you on the way. On a phone, where restoration lands later, it was the
+     whole of the reported glitch.
+     
+     Suppressing it during load was tried first and is worse: the guard has to
+     end at some arbitrary moment, and flipping the property part-way through a
+     page's life means a scroll begun under one rule finishes under another.
+     Having no global smooth at all needs no timing and cannot be mistimed. A
+     hash link jumps instead of gliding, which is the browser's own default and
+     lands in the right place because of the scroll-padding below. */
   scroll-padding-top: 5rem;
+  /* Reserve the scrollbar's width on every page, whether that page scrolls or
+     not. Where scrollbars take up space — Safari set to always show them, and
+     the default on Windows and most Linux desktops — the layout width
+     otherwise differs between a short page and a long one, and a window sized
+     within a scrollbar's width of a breakpoint gets a different layout on
+     each. On macOS's overlay scrollbars this reserves nothing. */
+  scrollbar-gutter: stable;
 }
 
+/* Nothing transitions until the page has settled. Set by the inline script in
+   the head and removed by site.js after load, so it covers the whole window in
+   which a custom property can resolve late and turn a value correction into a
+   visible animation.
+
+   Transitions only — animations are left alone, so the wordmark's cursor keeps
+   blinking through the load rather than starting with a jump. */
+:root.is-preload *,
+:root.is-preload *::before,
+:root.is-preload *::after {
+  transition: none !important;
+}
+
+/* No scroll guard here any more: with no global smooth to suppress, there is
+   nothing for a load-time guard to do. See the note on `html` above. */
+
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+  /* `scroll-behavior` is not reset here: it is already auto everywhere. The
+     scrolls that do animate name their behavior in site.js, and scrollBehavior()
+     there returns 'instant' for exactly this media query — a stylesheet reset
+     cannot override an explicit value, which is why the decision lives in the
+     script rather than here. */
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
@@ -150,7 +217,9 @@ a {
   color: var(--accent);
   text-decoration: none;
 }
-a:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (hover: hover) {
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
 
 img, svg, video { max-width: 100%; height: auto; }
 
@@ -195,17 +264,77 @@ hr {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  border-bottom: 1px solid var(--border-soft);
+  /* The bar as glass, in the way iOS and macOS do it. Three parts, and all
+     three are needed — any one alone reads as "translucent", not as a
+     material:
+
+       a thin tint, so what passes underneath is coloured rather than shown
+       a wide blur with saturation pushed up, which is what makes the colour
+         beneath bloom instead of smearing
+       a bright hairline along the top inside edge, which is the whole trick:
+         it is the lit edge of a pane catching the light, and without it the
+         bar looks like a faded rectangle
+
+     The tint is 76% rather than the 88% it was, so the blur has something to
+     work with. It is a balance, not a maximum — below about 70% the wordmark
+     starts competing with whatever scrolls under it. */
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
+  backdrop-filter: saturate(200%) blur(22px);
+  -webkit-backdrop-filter: saturate(200%) blur(22px);
+  /* No `contain: paint` here, and no transform or will-change either. All
+     three would let the compositor cache the blur, and all three clip or
+     reparent what hangs below the bar: the menu panel and the search card are
+     both descendants that paint outside it. `contain: paint` was tried and
+     erased the whole dropdown — and it did so invisibly to a geometry check,
+     because the panel's box stays correct while its pixels are clipped. */
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 65%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-strong) 10%, transparent),
+    0 1px 12px -8px color-mix(in srgb, var(--text-strong) 22%, transparent);
+}
+
+/* A 22px backdrop blur under a sticky bar is re-rasterised as the page scrolls
+   beneath it, and on iOS that is the one thing in this header expensive enough
+   to show: the bar appears to re-render while you scroll. Nothing about it is
+   measurable — the geometry, the classes and --header-h are identical in every
+   frame of a scroll in both engines — which is what points at the compositor
+   rather than the layout.
+   
+   Half the radius on a touch device. The glass still reads as glass at 11px
+   against a 76% tint; what goes is the cost per frame. Kept at full strength
+   for a pointer, where it has never misbehaved. */
+@media (pointer: coarse) {
+  .site-header {
+    backdrop-filter: saturate(180%) blur(11px);
+    -webkit-backdrop-filter: saturate(180%) blur(11px);
+  }
+}
+
+/* Without backdrop-filter there is no glass to be had, and a 76% tint is just
+   a see-through bar. Those browsers get the solid surface instead. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-header { background: var(--bg); }
 }
 
 .site-header .wrap {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  height: 3.75rem;
+  /* The two sizes the search panel's caret has to be placed against, named so
+     it can be derived rather than measured by hand. An icon button is centred
+     in the bar, so the drop from its bottom edge to the bar's is exactly half
+     the difference — arithmetic that stays true if either number moves. */
+  --bar-h: 3.75rem;
+  --icon-btn: 1.9rem;
+  /* How far the panel hangs below the bar. Enough to see the page between
+     them, which is what makes it read as a box rather than more of the bar. */
+  --panel-drop: 0.55rem;
+  --wrap-gap: 2rem;
+  /* Declared here, not on .nav-controls: the stacked row sets its own
+     column-gap from this value, and a variable on a child is not visible to
+     its parent. */
+  --controls-gap: 0.7rem;
+  gap: var(--wrap-gap);
+  height: var(--bar-h);
 }
 
 .brand {
@@ -255,7 +384,9 @@ hr {
      either background. */
   box-shadow: 0 0 0 1px var(--border);
 }
-.brand:hover { text-decoration: none; color: var(--accent); }
+@media (hover: hover) {
+  .brand:hover { text-decoration: none; color: var(--accent); }
+}
 .brand .sigil { color: var(--accent); }
 .brand .cursor {
   display: inline-block;
@@ -294,17 +425,56 @@ hr {
 
 .site-nav a.nav-link {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  /* 0.8rem — 12.8px — sat too small beside what shares the bar with it: the
+     wordmark is 0.95rem and the icons are 17px, so the links read as a
+     footnote to the row rather than as its main content. 0.88rem closes most
+     of that gap while staying a step under the wordmark, which should still
+     lead. */
+  font-size: 0.88rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.site-nav a.nav-link:hover,
+
 .site-nav a.nav-link[aria-current="page"] {
-  color: var(--text-strong);
-  text-decoration: none;
+    color: var(--text-strong);
+    text-decoration: none;
+  }
+@media (hover: hover) {
+  .site-nav a.nav-link:hover {
+    color: var(--text-strong);
+    text-decoration: none;
+  }
 }
 .site-nav a.nav-link[aria-current="page"] { color: var(--accent); }
+
+/* A hairline between the links, centred in the 1.4rem gap the row already
+   has. Quiet on purpose — it is there to group the links as a set, not to be
+   read as a control.
+
+   Absolutely positioned, so it contributes nothing to the row's width. That
+   matters more than it looks: site.js measures the natural width of this row
+   to decide when the links have to give way to the menu button, and a
+   separator that took up space would move that threshold on every link.
+
+   Skipped in the dropdown, where the links stack and already carry a
+   border-bottom each — a vertical rule there would cut across them. */
+.site-nav a.nav-link { position: relative; }
+.site-nav a.nav-link + a.nav-link::before {
+  content: "";
+  position: absolute;
+  left: -0.7rem;                 /* half of .site-nav's gap */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 0.85em;
+  background: color-mix(in srgb, var(--border-soft) 65%, transparent);
+  pointer-events: none;
+}
+.site-header.nav-collapsed .site-nav a.nav-link + a.nav-link::before { content: none; }
+@media (max-width: 1040px) {
+  .site-nav a.nav-link + a.nav-link::before { content: none; }
+}
 
 .nav-sep {
   width: 1px;
@@ -322,8 +492,8 @@ hr {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   padding: 0;
   background: none;
   border: 0;
@@ -333,7 +503,9 @@ hr {
   line-height: 0;
   transition: color 0.15s ease, background 0.15s ease;
 }
-.theme-toggle:hover { color: var(--accent); background: var(--bg-elev); }
+@media (hover: hover) {
+  .theme-toggle:hover { color: var(--accent); background: var(--bg-elev); }
+}
 .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* The icons themselves must not scale with the button either. */
 .theme-toggle svg { width: 17px; height: 17px; flex: 0 0 auto; }
@@ -352,7 +524,93 @@ hr {
 .nav-controls {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  /* One clearance for every divider in the bar.
+
+     The two dividers are built differently — .nav-sep is a real element and
+     takes the row's gap on each side, while the one before the theme toggle is
+     drawn as a pseudo-element and centres itself in a single gap — so equal
+     spacing has to be arranged rather than inherited. Three declarations do it:
+     the group cancels the wrap's gap down to this value, the theme toggle adds
+     one more of it so its divider has a double gap to centre in, and the
+     divider is offset by exactly one.
+
+     0.7rem is the clearance the nav links' own hairlines already sit in, half
+     of .site-nav's 1.4rem gap, so the whole row measures the same. */
+  gap: var(--controls-gap);
+}
+.nav-search + .theme-toggle { margin-left: var(--controls-gap); }
+
+/* Inline, the links and the controls are two separate groups and the row's own
+   gap is what tells them apart — no rule between them. .nav-sep exists for the
+   compact bar, where the icons sit together as one cluster. */
+.nav-sep { display: none; }
+
+/* The compact bar reads as one cluster of controls, so it is bracketed: a rule
+   before the menu button, between each pair, and after the theme toggle.
+
+   The outer two are pseudo-elements for the same reason as the one before the
+   theme toggle — a real element takes the row's gap on both sides and spreads
+   the icons out. The group also cancels the wrap's gap down to --controls-gap,
+   so every rule in the cluster sits in the same clearance.
+
+   Inline, none of this applies: the links and the controls are two groups and
+   the row's own gap is what separates them. */
+@media (max-width: 1040px) {
+  .nav-sep { display: block; }
+  .nav-controls {
+    margin-left: calc(var(--controls-gap) - var(--wrap-gap));
+    /* Room for the closing rule, which would otherwise be drawn past the
+       gutter. The cluster steps in by one clearance so that rule lands on the
+       content edge instead — where the eye already reads a boundary. */
+    margin-right: var(--controls-gap);
+  }
+}
+.site-header.nav-collapsed .nav-sep { display: block; }
+.site-header.nav-collapsed .nav-controls {
+  margin-left: calc(var(--controls-gap) - var(--wrap-gap));
+  margin-right: var(--controls-gap);
+}
+
+.nav-toggle { position: relative; }
+@media (max-width: 1040px) {
+  .nav-toggle::before,
+  .theme-toggle::after { content: ""; }
+}
+.site-header.nav-collapsed .nav-toggle::before,
+.site-header.nav-collapsed .theme-toggle::after { content: ""; }
+
+.nav-toggle::before,
+.theme-toggle::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 1.25rem;
+  background: var(--border);
+  pointer-events: none;
+}
+.nav-toggle::before  { left: calc(var(--controls-gap, 0.5rem) * -1); }
+.theme-toggle::after { right: calc(var(--controls-gap, 0.5rem) * -1); }
+
+
+/* The divider between the field and the theme toggle, matching .nav-sep — the
+   one beside the menu button — in height and colour.
+
+   Drawn as a pseudo-element rather than a second .nav-sep span, because a real
+   element would take the row's gap on both sides and push the two icons apart
+   again. This costs no width, which also keeps it out of the measurement
+   site.js runs on this group to decide when the bar has to collapse. */
+.nav-controls .theme-toggle { position: relative; }
+.nav-search + .theme-toggle::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--controls-gap) * -1);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 1.25rem;
+  background: var(--border);
+  pointer-events: none;
 }
 
 @media (max-width: 1040px) {
@@ -364,7 +622,7 @@ hr {
      
      Reclaiming it is what lets the wordmark fit whole on a narrow phone
      rather than truncating. */
-  .site-header .wrap { gap: 0.75rem; }
+  .site-header .wrap { --wrap-gap: 0.75rem; --controls-gap: 0.5rem; }
 
   /* The brand's own spacing tightens with it. 0.6rem between the avatar, sigil,
      handle and cursor is desktop's rhythm; three gaps of it plus 0.5rem of
@@ -378,18 +636,17 @@ hr {
      theme. The hamburger stands in for the nav links it replaces, so it takes
      their position rather than being pushed to the end. */
   .nav-toggle { order: 2; margin-left: auto; }
-  .nav-controls { order: 3; gap: 0.55rem; }
+  .nav-controls { order: 3; }
   .brand { min-width: 0; }
 
   .nav-search { width: auto; margin: 0; min-width: 0; }
   .nav-controls { min-width: 0; }
 
 
-  /* Below this the bar genuinely cannot hold the wordmark and a usable field
-     at the same time, so the brand steps aside. Above it, both fit. */
-  @media (max-width: 520px) {
-    .site-header.search-open .brand { display: none; }
-  }
+  /* There is a width below which the bar cannot hold the wordmark and a
+     usable field at the same time. The field opens as a panel under the bar
+     there, and site.js decides when by measuring, so the answer follows the
+     wordmark and the icons rather than a fixed breakpoint. */
 }
 /* With the field open the wordmark stops giving way — the field yields
    instead, down to its own floor, and if that is still not enough the links
@@ -401,13 +658,229 @@ hr {
    Deliberately NOT inside the 1100px media query. It lived there first, which
    put it in the one range where the problem does not occur: the wordmark is
    clipped between 1101px and roughly 1255px, where the links are still inline
-   and an open field leaves them nothing to take but the brand. */
-.site-header.search-open .brand { flex-shrink: 0; }
+   and an open field leaves them nothing to take but the brand.
+
+   Not while the field is a panel. There it takes no room in the row, so there
+   is nothing for the wordmark to give way to — and pinning it hands a
+   truncated wordmark its full width back, which moves everything beside it.
+
+   Whenever the field is in the bar, though — not only while it is open. Keying
+   this to the open state made closing the field jerk: .search-open comes off
+   the instant the icon is tapped and the field then spends 0.18s getting to
+   zero, so for that 0.18s the wordmark was unpinned while the field still held
+   its full width. Between 1100 and 1255 it collapsed from 188px into an
+   ellipsis, cutting the cursor mid-blink, and grew back as the field emptied.
+
+   Pinning it in both states costs nothing: panel mode is off exactly when the
+   row has been measured to hold the wordmark, the menu button and the controls
+   with the field at its floor, so there is by construction room for it. What
+   gives instead is the field, which is on its way out anyway. */
+.site-header:not(.search-panel) .brand { flex-shrink: 0; }
+
+/* No room for the wordmark beside an open field: the field opens as a panel
+   under the bar instead of squeezing into it.
+
+   The bar itself does not change — same height, same three icons in the same
+   places — so tapping search never moves the thing you just tapped. The panel
+   drops from beneath, which is what makes the caret below honest: it points at
+   the control the panel belongs to.
+
+   .search-panel goes on and comes off in site.js, and it follows the width of
+   the bar rather than the state of the field — so everything below is written
+   to be correct with the field closed as well as open. */
+
+/* The one frame in which the field changes shape. site.js puts this on, swaps
+   .search-panel, forces the layout and takes it off again — see the note by
+   setPanelMode(). Everything the swap touches has to be listed: the field, the
+   form that holds it, the caret, and the icon whose colour is a state of the
+   panel. */
+.site-header.shape-switch .nav-search,
+.site-header.shape-switch .nav-search-input,
+.site-header.shape-switch .nav-search-toggle,
+.site-header.shape-switch .nav-search-toggle::after,
+.site-header.shape-switch .nav-controls {
+  transition: none !important;
+}
+
+/* The form keeps the geometry it has closed: the width of its icon, no gap
+   after it, and no give. Opening otherwise restores the form's own gap and
+   lets `flex: 0 1 auto; min-width: 0` shrink it below its icon, and whatever
+   that frees goes to the wordmark, which slides the icons along with it. A
+   panel asks the row for nothing, so neither should the form holding it. */
+.site-header.search-panel .nav-search,
+.site-header.search-panel .nav-search.open {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  gap: 0;
+}
+.site-header.search-panel.search-open .nav-controls { min-width: auto; }
+
+/* The field. The selector names .nav-search as well, which looks like one
+   class too many. It is not: the field's own open-state rules in the component
+   section are three classes deep and come later in the file, so at equal
+   specificity they win on order and put back the width, padding and border
+   this block is replacing. A fourth class settles it wherever this block
+   sits. */
+.site-header.search-panel .nav-search .nav-search-input {
+  position: absolute;
+  /* Against .site-header, which is the nearest positioned ancestor — the form
+     and the control cluster are both static, on purpose. So the box is placed
+     against the bar rather than against the form it lives in. */
+  top: calc(100% + var(--panel-drop));
+  left: var(--gutter);
+  right: var(--gutter);
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  /* A card, not a band. Held off the bar by --panel-drop so the page shows
+     between the two, inset to the gutter so it lines up with the column below,
+     and closed on all four sides — a band sharing the bar's fill and running
+     edge to edge read as more bar rather than as something that had dropped
+     out of it. */
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: var(--border);
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-elev);
+  /* Two shadows: a tight one that seats the card against the page and a wide
+     soft one that lifts it off. One alone reads as either a sticker or a
+     smudge. */
+  box-shadow: 0 2px 5px -3px color-mix(in srgb, var(--text-strong) 42%, transparent),
+              0 16px 34px -20px color-mix(in srgb, var(--text-strong) 62%, transparent);
+}
+
+/* Restoring what this block's own border-color took away: the field turns its
+   hairline accent on focus, the same accent the icon above it is wearing, and
+   at four classes deep the plain `:focus` rule no longer reached it. */
+.site-header.search-panel .nav-search .nav-search-input:focus {
+  border-color: var(--accent);
+}
+/* And the caret with it. The caret is drawn on the button and the focus is on
+   the field, which are siblings, so the state has to be read across — a grey
+   arrow sitting on an accent card is two shapes, not one. Where `:has` is
+   missing the caret simply stays in the resting hairline, which is the same
+   thing it does with the field open and focus elsewhere in the bar. */
+.site-header.search-panel .nav-search:has(.nav-search-input:focus) .nav-search-toggle::after {
+  border-color: var(--accent);
+}
+
+/* The caret: a square rotated 45 degrees with two of its edges bordered, so it
+   reads as the card's own top corner drawn up towards the icon rather than as
+   a separate mark stuck on. Centred under the icon, drawn in the card's fill
+   and hairline, and sitting astride the card's top border so the two are one
+   shape.
+
+   The offset is derived, not measured. From the icon's bottom edge it is half
+   of whatever the bar has spare around an icon button, then the bar's own
+   hairline, then the drop — which lands on the card's top border — and finally
+   back up by half the square so the square straddles that border rather than
+   hanging under it. Every term is a token, so moving the bar height or the
+   icon size moves the caret with them. */
+.nav-search-toggle { position: relative; }
+.site-header.search-panel.search-open .nav-search-toggle { color: var(--accent); }
+.site-header.search-panel .nav-search-toggle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(100%
+            + (var(--bar-h) - var(--icon-btn)) / 2
+            + 1px
+            + var(--panel-drop)
+            - 0.275rem);
+  width: 0.55rem;
+  height: 0.55rem;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.site-header.search-panel.search-open .nav-search-toggle::after { opacity: 1; }
+
+/* Something behind the card. On its own it reads as a bubble parked over the
+   page; with a wash under it, it reads as a layer the bar has opened and the
+   page as the thing behind that layer.
+
+   A wash toward --bg rather than a dim toward black: the same declaration then
+   works in both themes, fading the page out on light and down on dark, where a
+   fixed dark tint would only be right on one of them.
+
+   On body, not on .site-header, and that is forced rather than chosen — the
+   bar carries a backdrop-filter, which makes it the containing block for fixed
+   descendants, so a fixed overlay declared inside it would be measured against
+   the bar instead of the viewport. Sitting above .to-top (40) and below the
+   bar (50), so the bar and its card stay clear of it. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: var(--header-h, 3.75rem) 0 0 0;
+  z-index: 45;
+  background: color-mix(in srgb, var(--bg) 64%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  /* Taps go to the page underneath, which is what already closes an empty
+     field — the wash is something to see, not something to hit. */
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+html:has(.site-header.search-panel.search-open) body::after {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, visibility 0s linear 0s;
+}
+@supports (backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px)) {
+  html:has(.site-header.search-panel.search-open) body::after {
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* It drops. A card should arrive by moving, not by being uncovered — and the
+     clip that uncovered the full-bleed band cannot be used on a card anyway:
+     `clip-path: inset(0)` clips to the border box, and the two shadows that
+     lift this card off the page are painted outside it, so the finished card
+     would have had no shadow at all.
+
+     A short translate carries no such cost, distorts nothing, and is what the
+     menus this is imitating do. visibility rides along with a delay equal to
+     the travel, so the closed card is out of the tab order without the close
+     losing its animation. The caret travels with the card rather than fading
+     in place, since it is meant to be part of it. */
+  .site-header.search-panel .nav-search .nav-search-input {
+    transform: translateY(-0.45rem);
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+                opacity 0.15s ease,
+                visibility 0s linear 0.2s;
+  }
+  .site-header.search-panel .nav-search-toggle::after {
+    transform: translateX(-50%) translateY(-0.45rem) rotate(45deg);
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+                opacity 0.15s ease,
+                border-color 0.15s ease;
+  }
+  .site-header.search-panel .nav-search.open .nav-search-input,
+  .site-header.search-panel .nav-search .nav-search-input.is-open {
+    transform: none;
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1),
+                opacity 0.16s ease,
+                visibility 0s linear 0s;
+  }
+  .site-header.search-panel .nav-search.open .nav-search-toggle::after {
+    transform: translateX(-50%) rotate(45deg);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1),
+                opacity 0.18s ease 0.04s,
+                border-color 0.15s ease;
+  }
+}
 
 @media (max-width: 1040px) {
   .site-nav {
     position: fixed;
-    inset: 3.75rem 0 auto 0;
+    inset: var(--header-h, 3.75rem) 0 auto 0;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
@@ -443,7 +916,7 @@ hr {
        that reaches its end from chaining through to the page underneath. On a
        short menu there is nothing to scroll at all, which the wheel handler in
        site.js covers. */
-    max-height: calc(100vh - 3.75rem);
+    max-height: calc(100vh - var(--header-h, 3.75rem));
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -457,6 +930,9 @@ hr {
     border-bottom: 1px solid var(--border-soft);
     font-size: 0.85rem;
   }
+  /* Closes the list at the top as well as the bottom, so the panel reads as a
+     bounded set rather than one that starts mid-air. */
+  .site-nav a.nav-link:first-of-type { border-top: 1px solid var(--border-soft); }
   .nav-toggle {
     display: inline-flex;
     background: none;
@@ -481,13 +957,14 @@ hr {
    class cannot be combined in one selector. The width rule stays as the
    baseline because without JS the hamburger cannot open at all. */
 .site-header.nav-collapsed .nav-toggle { order: 2; margin-left: auto; }
-.site-header.nav-collapsed .nav-controls { order: 3; gap: 0.55rem; min-width: 0; }
+.site-header.nav-collapsed .wrap { --controls-gap: 0.5rem; }
+.site-header.nav-collapsed .nav-controls { order: 3; min-width: 0; }
 .site-header.nav-collapsed .brand { min-width: 0; }
 .site-header.nav-collapsed .nav-search { width: auto; margin: 0; min-width: 0; }
 
 .site-header.nav-collapsed .site-nav {
   position: fixed;
-  inset: 3.75rem 0 auto 0;
+  inset: var(--header-h, 3.75rem) 0 auto 0;
   flex-direction: column;
   align-items: stretch;
   gap: 0;
@@ -523,7 +1000,7 @@ hr {
      that reaches its end from chaining through to the page underneath. On a
      short menu there is nothing to scroll at all, which the wheel handler in
      site.js covers. */
-  max-height: calc(100vh - 3.75rem);
+  max-height: calc(100vh - var(--header-h, 3.75rem));
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -536,6 +1013,9 @@ hr {
   padding: 0.7rem 0;
   border-bottom: 1px solid var(--border-soft);
   font-size: 0.85rem;
+}
+.site-header.nav-collapsed .site-nav a.nav-link:first-of-type {
+  border-top: 1px solid var(--border-soft);
 }
 .site-header.nav-collapsed .nav-toggle {
   display: inline-flex;
@@ -587,17 +1067,18 @@ hr {
 
 /* The full logo row lives here, so give it the widest of the three gaps. It
    is a single centred line at every width; see the .socials rule for how. */
-/* align-self, because .site-footer .wrap is a centred column and its children
-   are therefore sized to their content. An indefinite width is one the gap
-   percentage below resolves to zero against, which crushes the row into one
-   solid block of icons. Stretching gives it the real column width to divide. */
+/* align-self, because .site-footer .wrap is a centred column and its
+   children are therefore sized to their content. The gap percentage below
+   needs a definite width to divide against. */
 .footer-socials { align-self: stretch; }
 .footer-socials .socials {
   justify-content: center;
   --gap: 1.6rem;
 }
 .footer-socials .socials a { color: var(--text-muted); }
-.footer-socials .socials a:hover { color: var(--accent); }
+@media (hover: hover) {
+  .footer-socials .socials a:hover { color: var(--accent); }
+}
 
 .footer-meta {
   display: flex;
@@ -649,10 +1130,12 @@ hr {
   line-height: 0;
   transition: color 0.15s ease, transform 0.15s ease;
 }
-.socials a:hover {
-  color: var(--accent);
-  transform: translateY(-2px);
-  text-decoration: none;
+@media (hover: hover) {
+  .socials a:hover {
+    color: var(--accent);
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
 }
 .socials svg {
   width: var(--icon);
@@ -685,26 +1168,24 @@ hr {
 }
 
 .intro-tagline {
-  /* 12px under a 46px wordmark read as crowded; the line needs to sit as a
-     separate statement rather than as a subtitle glued to the name. */
-  margin: 1.1rem 0 0.9rem;
+  /* No top margin: the h1's own 0.6rem sets this distance, which is the same
+     0.6rem that separates a title from its lede on every other page. */
+  margin: 0 0 0.9rem;
+  /* Monospace, but the same rank as .page-head .lede — this line sits in the
+     same slot every other page fills with a lede, inside the same block, above
+     the same rule. Size and colour match it so the two read as one level of the
+     hierarchy in two voices; the face is what makes the home page its own. */
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 0.96rem;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: var(--text);
   /* No max-width: the line is meant to read as one line. It still wraps on a
      narrow phone, which is correct — forcing nowrap there would push the page
      sideways, and a horizontal scrollbar costs more than a second line does. */
 }
 
-.intro h1 {
-  font-size: clamp(2rem, 5.5vw, 2.9rem);
-  line-height: 1.12;
-  letter-spacing: -0.025em;
-  color: var(--text-strong);
-  margin: 0 0 0.75rem;
-  font-weight: 650;
-}
+/* Deliberately identical to .page-head h1 — see that rule, which sets both.
+   One page title, one size. */
 
 /* This, not the tagline's bottom margin, is what sets the distance to the icon
    row — 44px, set back when the name sat directly above the icons with nothing
@@ -762,7 +1243,34 @@ hr {
    is exactly the width of the featured card above it. */
 .home-streams .post-list { margin-inline: 0; }
 .home-streams .post-list .post-item { padding-inline: 1.1rem; }
-.home-streams .post-list .post-item::before { left: 1.1rem; right: 1.1rem; }
+/* The home page leads with one featured entry and lists a few others beneath
+   it. Those others are context, not the headline, so their resting surface is
+   quieter than the list pages use: no fill at all, and a hairline at roughly
+   half strength. The featured card keeps the full treatment, which is what
+   makes it read as the thing to look at first.
+
+   Done by overriding the surface's inputs rather than by writing a second
+   ::after rule, so the card keeps one definition everywhere. Hover is left
+   alone deliberately — going from no fill to the full hover fill makes the
+   pointer's effect on these rows more pronounced, not less. */
+.home-streams .stream-list {
+  /* A rung below the featured card on both axes, at rest and on hover:
+
+       secondary at rest   faint fill, light hairline
+       secondary on hover  more fill, full soft hairline
+       featured at rest    --bg-elev, full --border          <- still louder
+       featured on hover   --card-hover-bg, accent border, shadow
+
+     So hovering one of these is clearly something, and still never competes
+     with the entry the page is leading on. Expressed against --bg-elev and
+     --border-soft rather than the card tokens, because a custom property
+     cannot be defined in terms of itself. */
+  --card-rest-bg: color-mix(in srgb, var(--bg-elev) 45%, transparent);
+  --card-rest-border: color-mix(in srgb, var(--border-soft) 60%, transparent);
+  /* Hover is not overridden: these rows light up exactly as the featured card
+     does, so the pointer means one thing everywhere on the page. Only the
+     resting state says which entry is the headline. */
+}
 
 .stream {
   min-width: 0;                    /* let long titles wrap, not overflow */
@@ -860,7 +1368,9 @@ hr {
   font-size: 0.8rem;
   color: var(--text-faint);
 }
-.section-head .more:hover { color: var(--accent); }
+@media (hover: hover) {
+  .section-head .more:hover { color: var(--accent); }
+}
 
 /* --------------------------------------------------------------------------
    Featured (latest) post card
@@ -899,7 +1409,9 @@ hr {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
-.after-featured .more:hover { color: var(--accent); }
+@media (hover: hover) {
+  .after-featured .more:hover { color: var(--accent); }
+}
 
 /* Foot of the home page's post list. Ruled off and full width, because its job
    is to say the list stopped early rather than to be a quiet "more" link — the
@@ -915,7 +1427,9 @@ hr {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
-.list-more .more:hover { color: var(--accent); }
+@media (hover: hover) {
+  .list-more .more:hover { color: var(--accent); }
+}
 
 .featured {
   position: relative;
@@ -971,7 +1485,9 @@ hr {
   font-weight: 640;
 }
 .featured h3 a { color: var(--text-strong); }
-.featured h3 a:hover { color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  .featured h3 a:hover { color: var(--accent); text-decoration: none; }
+}
 
 .featured .excerpt {
   color: var(--text);
@@ -993,14 +1509,18 @@ hr {
   padding: 0.55rem 1.1rem;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.btn:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent-dim);
-  text-decoration: none;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .btn:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent-dim);
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
 }
 .btn .arrow { transition: transform 0.15s ease; }
-.btn:hover .arrow { transform: translateX(3px); }
+@media (hover: hover) {
+  .btn:hover .arrow { transform: translateX(3px); }
+}
 
 .stream-more .btn {
   color: var(--accent);
@@ -1008,11 +1528,18 @@ hr {
   transition: background 0.15s ease, color 0.15s ease,
               border-color 0.15s ease, transform 0.15s ease;
 }
-.stream-more .btn:hover,
+
 .stream-more .btn:focus-visible {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+@media (hover: hover) {
+  .stream-more .btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1023,7 +1550,11 @@ hr {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-width: 100%;
+  /* No max-width here. The list is *meant* to be wider than its column — the
+     hover surface bleeds 1.25rem past each edge (see the margin-inline rule
+     further down) and each row pads the same amount back, so the text lands on
+     the column edge exactly. Capping the width while the negative margin still
+     pulls it left makes the bleed one-sided and narrows the text column. */
 }
 
 /* Roomier than it looks like it needs to be: now that excerpts render at full
@@ -1048,7 +1579,9 @@ hr {
   font-weight: 640;
 }
 .post-item :is(h2, h3) a { color: var(--text-strong); }
-.post-item :is(h2, h3) a:hover { color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  .post-item :is(h2, h3) a:hover { color: var(--accent); text-decoration: none; }
+}
 
 .post-item .excerpt {
   color: var(--text);
@@ -1087,24 +1620,14 @@ hr {
 .post-list .post-item,
 .tag-posts .tag-post { padding-inline: 1.25rem; }
 
-/* The separator stays at text width instead of widening with the row. Moved
-   off `border-bottom`, which would now span the bleed too. */
+/* No separator between entries any more. It existed to stop rows running
+   together when they had no surface of their own; now that each one is drawn
+   as a card at rest, the line lands a pixel inside the card's own bottom
+   border and reads as a doubled edge. The card does the separating. */
 .post-list .post-item,
 .tag-posts .tag-post { border-bottom: 0; }
 .post-list .post-item::before,
-.tag-posts .tag-post::before {
-  content: "";
-  position: absolute;
-  left: 1.25rem;
-  right: 1.25rem;
-  bottom: 0;
-  height: 1px;
-  background: var(--border-soft);
-}
-.post-list .post-item:last-child::before,
-.post-list .post-item.is-last-shown::before,
-.tag-posts .tag-post:last-child::before,
-.tag-posts .tag-post.is-last-shown::before { content: none; }
+.tag-posts .tag-post::before { content: none; }
 
 .post-item,
 .tag-post,
@@ -1129,65 +1652,85 @@ hr {
   inset: 1.5px 0;
   z-index: 0;
   border-radius: 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  opacity: 0;
-  transform: translateY(2px);
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  /* Drawn at rest as well as on hover, so every entry has an edge and the
+     list does not read as bare text on the page background. Hovering deepens
+     the surface rather than conjuring it; colour and border carry the whole
+     change, so nothing moves under the text. */
+  background: var(--card-rest-bg);
+  border: 1px solid var(--card-rest-border);
+  box-shadow: none;
+  transition: background-color 0.16s ease, border-color 0.16s ease,
+              box-shadow 0.16s ease;
   pointer-events: none;
 }
 
-/* The grouped list keeps the same symmetric bleed as everywhere else. An
-   earlier version inset only the left edge to avoid painting over the year
-   bracket, which made the surface visibly off-centre — 4.8px inside on the
-   left against 20px proud on the right. The bracket simply sits under the card
-   on hover, which is what a row-becomes-a-card effect should look like.
 
-   The entry still carries 1rem of left padding to clear that bracket, and the
-   surface is positioned against the padding box — so an identical -1.25rem on
-   both sides lands 1rem off-centre *relative to the text*. Subtracting the
-   padding back out leaves an equal gap either side of the text. */
-/* No nudge needed now: the surface is inset:0, so it follows the row's own
-   padding box, indent and all. */
-
-.post-item.card-link:hover::after,
 .post-item.card-link:focus-within::after,
-.tag-post.card-link:hover::after,
 .tag-post.card-link:focus-within::after {
-  opacity: 1;
-  transform: none;
-}
-.post-item.card-link:hover :is(h2, h3) a,
+    background: var(--card-hover-bg);
+    border-color: var(--card-hover-border);
+    box-shadow: var(--card-hover-shadow);
+  }
+
 .post-item.card-link:focus-within :is(h2, h3) a,
-.tag-post.card-link:hover :is(h2, h3) a,
 .tag-post.card-link:focus-within :is(h2, h3) a { color: var(--accent); }
+@media (hover: hover) {
+  .post-item.card-link:hover::after,
+  .tag-post.card-link:hover::after {
+    background: var(--card-hover-bg);
+    border-color: var(--card-hover-border);
+    box-shadow: var(--card-hover-shadow);
+  }
+  .post-item.card-link:hover :is(h2, h3) a,
+  .tag-post.card-link:hover :is(h2, h3) a { color: var(--accent); }
+}
 
 /* The featured card already is a box, so it lifts instead. The transform goes
    on the wrapper so the label tab travels with the border it straddles. */
 .featured-wrap.card-link { transition: transform 0.16s ease; }
 .featured-wrap.card-link .featured {
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  transition: background-color 0.16s ease, border-color 0.16s ease,
+              box-shadow 0.16s ease;
 }
 .featured-wrap.card-link .featured::before { transition: width 0.16s ease; }
-.featured-wrap.card-link:hover,
+
 .featured-wrap.card-link:focus-within { transform: translateY(-2px); }
-.featured-wrap.card-link:hover .featured,
+
 .featured-wrap.card-link:focus-within .featured {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  box-shadow: 0 8px 26px -18px color-mix(in srgb, var(--accent) 70%, transparent);
-}
-.featured-wrap.card-link:hover .featured::before,
+    /* The same three tokens every other card hovers with. The fill moves too:
+       border and shadow alone made the pointer's effect read as an outline
+       change on a card that stayed the same colour. */
+    background: var(--card-hover-bg);
+    border-color: var(--card-hover-border);
+    box-shadow: var(--card-hover-shadow);
+  }
+
 .featured-wrap.card-link:focus-within .featured::before { width: 4px; }
-.featured-wrap.card-link:hover h3 a,
+
 .featured-wrap.card-link:focus-within h3 a { color: var(--accent); }
+@media (hover: hover) {
+  .featured-wrap.card-link:hover { transform: translateY(-2px); }
+  .featured-wrap.card-link:hover .featured {
+    /* The same three tokens every other card hovers with. The fill moves too:
+       border and shadow alone made the pointer's effect read as an outline
+       change on a card that stayed the same colour. */
+    background: var(--card-hover-bg);
+    border-color: var(--card-hover-border);
+    box-shadow: var(--card-hover-shadow);
+  }
+  .featured-wrap.card-link:hover .featured::before { width: 4px; }
+  .featured-wrap.card-link:hover h3 a { color: var(--accent); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .post-item.card-link::after,
   .featured-wrap.card-link,
   .featured-wrap.card-link .featured { transition: none; }
-  .post-item.card-link::after,
-  .featured-wrap.card-link:hover,
-  .featured-wrap.card-link:focus-within { transform: none; }
+  
+.featured-wrap.card-link:focus-within { transform: none; }
+@media (hover: hover) {
+  .featured-wrap.card-link:hover { transform: none; }
+}
 }
 
 .readmore {
@@ -1271,25 +1814,6 @@ hr {
   background: var(--border-soft);
 }
 
-/* Close the list: the final entry keeps a rule under it, so the run of posts
-   is enclosed top and bottom rather than trailing off.
-
-   Keyed on `.is-last-shown` as well as `:last-child`, and that pairing is the
-   whole point. `:last-child` is the last in the DOM; with pagination the last
-   entry *on screen* is a different element, so page 1 closed with nothing at
-   all while page 2 — whose last entry happens to also be the last child —
-   drew the rule. Two pages of the same list ending differently.
-
-   Drawn through the shared ::before rather than `border-bottom`, because the
-   row now extends past the text column to carry the hover surface: a border
-   would have run the full padded width while every separator above it stopped
-   at the text. Only the colour changes, to mark it as the closing rule. */
-.post-list.is-grouped .post-item:last-child::before,
-.post-list.is-grouped .post-item.is-last-shown::before {
-  content: "";
-  background: var(--border);
-}
-
 .post-list.is-grouped .post-item { margin-left: var(--list-indent, 1.5rem); }
 
 /* A hairline running down the year's block, so the bracket is visible and not
@@ -1343,25 +1867,29 @@ hr {
   border-radius: 4px;
   padding: 0.1rem 0.5rem;
 }
-/* `.tag`, not `a.tag`. The filter chips on /tags/ became <button> when they
-   stopped being jump links, and this rule kept requiring an anchor — so all
-   twenty of them had no hover feedback at all, while `button.tag` further
-   down still declared a transition for a hover that could never fire.
-   :focus-visible is here for the same reason: these are real controls and
-   were relying on the UA default ring. */
-.tag:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  text-decoration: none;
+@media (hover: hover) {
+  /* `.tag`, not `a.tag`. The filter chips on /tags/ became <button> when they
+     stopped being jump links, and this rule kept requiring an anchor — so all
+     twenty of them had no hover feedback at all, while `button.tag` further
+     down still declared a transition for a hover that could never fire.
+     :focus-visible is here for the same reason: these are real controls and
+     were relying on the UA default ring. */
+  .tag:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    text-decoration: none;
+  }
 }
 .tag:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-button.tag:disabled:hover {
-  /* A chip that cannot narrow the selection should not invite the click. */
-  color: var(--text-muted);
-  border-color: var(--border);
+@media (hover: hover) {
+  button.tag:disabled:hover {
+    /* A chip that cannot narrow the selection should not invite the click. */
+    color: var(--text-muted);
+    border-color: var(--border);
+  }
 }
 
 /* Tag index page */
@@ -1395,7 +1923,16 @@ button.tag:disabled:hover {
    up with a different gap from every page that has one. */
 .page-head.no-rule { border-bottom: 0; padding-bottom: 0; margin-bottom: 1.25rem; }
 
-.page-head h1 {
+/* A heading with no lede under it needs less room beneath. The 1.25rem is
+   measured for a heading *and* its lede — it separates the pair from what
+   follows — so with no lede it becomes the gap under the h1 itself, wider than
+   the 0.6rem every other page sits at. */
+.page-head:not(:has(.lede)) { margin-bottom: 0.6rem; }
+
+/* Every page title, the home page's name included. One selector rather than
+   two matching ones, so they cannot drift apart again. */
+.page-head h1,
+.intro h1 {
   font-size: clamp(1.8rem, 4.5vw, 2.5rem);
   line-height: 1.15;
   letter-spacing: -0.025em;
@@ -1474,10 +2011,12 @@ button.tag:disabled:hover {
   white-space: nowrap;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
-.post-back a:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  text-decoration: none;
+@media (hover: hover) {
+  .post-back a:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    text-decoration: none;
+  }
 }
 .post-back a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -1659,9 +2198,22 @@ button.tag:disabled:hover {
   font-size: 1.5rem;
   font-weight: 640;
   margin-top: 1.4rem;
+  /* Stated rather than inherited: everything else here is set — size, weight,
+     the space above, the rule — and the space below was the one value left to
+     the browser. On its own this changes nothing, because adjacent margins
+     collapse and the paragraph below asks for more; the rule beneath is what
+     actually closes the gap. Both are set so neither can quietly become the
+     one that decides. */
+  margin-bottom: 0.7rem;
   padding-top: 0.7rem;
   border-top: 1px solid var(--border-soft);
 }
+/* A heading belongs to what follows it, so it sits closer to that than to
+   what came before. Adjacent vertical margins collapse to the larger of the
+   two, so this is the rule that sets the distance — the heading's own
+   margin-bottom is never the deciding value. */
+.prose h2 + * { margin-top: 0.7rem; }
+
 .prose h3 { font-size: 1.2rem; font-weight: 620; margin-top: 2.25rem; }
 .prose h4 {
   font-size: 1rem;
@@ -1680,9 +2232,12 @@ button.tag:disabled:hover {
   font-weight: 400;
   text-align: left;
 }
-.prose h2:hover .anchor,
-.prose h3:hover .anchor,
+
 .prose .anchor:focus { opacity: 1; text-decoration: none; }
+@media (hover: hover) {
+  .prose h2:hover .anchor,
+  .prose h3:hover .anchor { opacity: 1; text-decoration: none; }
+}
 @media (max-width: 700px) { .prose .anchor { display: none; } }
 
 .prose ul, .prose ol { padding-left: 1.4rem; }
@@ -1739,7 +2294,9 @@ button.tag:disabled:hover {
   font-weight: 500;
   white-space: nowrap;
 }
-.prose tbody tr:hover { background: var(--bg-elev); }
+@media (hover: hover) {
+  .prose tbody tr:hover { background: var(--bg-elev); }
+}
 
 /* Wide content must scroll inside itself, never the page */
 .table-scroll { overflow-x: auto; max-width: 100%; }
@@ -1877,10 +2434,13 @@ button.tag:disabled:hover {
   opacity: 0;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-.prose div.highlighter-rouge:hover .copy-btn,
-.prose figure.highlight:hover .copy-btn,
+
 .copy-btn:focus { opacity: 1; }
-.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+@media (hover: hover) {
+  .prose div.highlighter-rouge:hover .copy-btn,
+  .prose figure.highlight:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+}
 .copy-btn.copied { color: var(--accent); border-color: var(--accent); }
 
 /* Rouge tokens — dark. Comment grey matches --text-faint so it clears AA
@@ -2125,7 +2685,9 @@ button.tag:disabled:hover {
   display: inline-block;
 }
 .prose details[open] > summary::before { transform: rotate(90deg); }
-.prose summary:hover { color: var(--accent); }
+@media (hover: hover) {
+  .prose summary:hover { color: var(--accent); }
+}
 .prose details > *:not(summary) { margin-top: 0; }
 .prose details > .highlighter-rouge:first-of-type { margin-top: 0; }
 
@@ -2215,13 +2777,17 @@ button.tag:disabled:hover {
   margin-left: -1.35rem;
   padding-left: 1.35rem;
 }
-.toc a:hover { color: var(--text-strong); text-decoration: none; }
+@media (hover: hover) {
+  .toc a:hover { color: var(--text-strong); text-decoration: none; }
+}
 .toc a.active {
   color: var(--accent);
   border-left-color: var(--accent);
 }
 .toc .lvl-3 a { padding-left: 2.1rem; font-size: 0.95em; color: var(--text-muted); }
-.toc .lvl-3 a:hover { color: var(--text-muted); }
+@media (hover: hover) {
+  .toc .lvl-3 a:hover { color: var(--text-muted); }
+}
 .toc .lvl-3 a.active { color: var(--accent); }
 
 @media (max-width: 1000px) {
@@ -2298,7 +2864,9 @@ button.tag:disabled:hover {
   display: block;
   background: var(--bg-elev);
 }
-.pager a:hover { border-color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  .pager a:hover { border-color: var(--accent); text-decoration: none; }
+}
 .pager .dir {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -2422,6 +2990,12 @@ h1, h2, h3, h4,
   font-size: 0.85rem;
   border-left: 1px solid var(--border-soft);
   padding-left: 1.1rem;
+  /* Room for the scrollbar to live in. Each year's summary puts its post
+     count hard against the right edge, and an overlay scrollbar — macOS's
+     default — reserves no space and paints over whatever is beneath, which is
+     why `scrollbar-gutter: stable` does not answer this case. Padding holds
+     the content clear of both kinds. */
+  padding-right: 1rem;
 }
 @media (max-width: 1000px) {
   .archive-rail {
@@ -2458,7 +3032,9 @@ h1, h2, h3, h4,
   list-style: none;          /* the default triangle sits badly against a rule */
 }
 .archive-year > summary::-webkit-details-marker { display: none; }
-.archive-year > summary:hover { color: var(--accent); }
+@media (hover: hover) {
+  .archive-year > summary:hover { color: var(--accent); }
+}
 .archive-year > summary .n {
   color: var(--text-faint);
   font-size: 0.72rem;
@@ -2511,7 +3087,9 @@ h1, h2, h3, h4,
   color: var(--text-muted);
   line-height: 1.35;
 }
-.archive-year li a:hover { color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  .archive-year li a:hover { color: var(--accent); text-decoration: none; }
+}
 .archive-year li a .d {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -2572,8 +3150,9 @@ h1, h2, h3, h4,
    it would if you were hovering the card itself. One vocabulary, not two. */
 .post-item.is-hover::after,
 .tag-post.is-hover::after {
-  opacity: 1;
-  transform: none;
+  background: var(--card-hover-bg);
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-hover-shadow);
 }
 .post-item.is-hover :is(h2, h3) a,
 .tag-post.is-hover :is(h2, h3) a { color: var(--accent); }
@@ -2785,9 +3364,11 @@ button.tag.is-on .count { color: var(--bg); opacity: 0.75; }
   color: var(--c-green);
   border-color: color-mix(in srgb, var(--c-green) 40%, transparent);
 }
-.tag[data-tag="ctf"]:hover {
-  color: var(--c-green);
-  border-color: var(--c-green);
+@media (hover: hover) {
+  .tag[data-tag="ctf"]:hover {
+    color: var(--c-green);
+    border-color: var(--c-green);
+  }
 }
 /* Full opacity, not a 70% mix: mixing toward transparent over --bg-elev gave
    #4aaa6e in light mode, 2.72:1 at 0.72rem. --text-faint, which this
@@ -2847,7 +3428,9 @@ button.tag.is-out {
   color: var(--text-muted);
   cursor: pointer;
 }
-.tag-clear:hover { color: var(--accent); border-color: var(--accent); }
+@media (hover: hover) {
+  .tag-clear:hover { color: var(--accent); border-color: var(--accent); }
+}
 
 /* Pulled up so the first row keeping its padding does not push the list away
    from the chips — but only part of the way. Cancelling the full 1.1rem left
@@ -2890,7 +3473,9 @@ button.tag.is-mini {
   padding: 0.1rem 0.45rem;
   cursor: pointer;
 }
-.tag.is-mini:hover { border-color: var(--accent); color: var(--accent); }
+@media (hover: hover) {
+  .tag.is-mini:hover { border-color: var(--accent); color: var(--accent); }
+}
 .tag.is-mini:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -2952,14 +3537,41 @@ button.tag.is-mini {
 .cat {
   margin: 0 0 1.4rem;
 }
-/* Photos are served uncropped, so height is whatever the frame is — capped so
-   a tall portrait does not push the links off screen. */
+/* A definite box, so the space is reserved before the file arrives.
+
+   With `width: auto` and no dimensions on the <img> there was nothing for the
+   browser to reserve: the image measured 2px tall until it decoded and then
+   jumped to ~446px, shoving the cat's name down the page with it. Chromium
+   scored the shift at 0.28 on every visit. The dimensions cannot come from the
+   markup either — Jekyll runs no plugins here, so it cannot know how big a
+   file in this folder is — which leaves the ratio, declared once.
+
+   `contain`, never `cover`: a photo is shown whole. All three cats are 3:4 and
+   fill this frame exactly; anything else letterboxes rather than crops. The
+   height cap keeps a tall one from pushing the links off screen, and is itself
+   definite, so it reserves space just as well. */
 .cat img {
   display: block;
   margin: 0 auto;
-  width: auto;
-  max-width: min(100%, 340px);
-  max-height: 60vh;
+  /* One width, one ratio, and nothing that depends on the viewport's height.
+
+     The box has to stay 3:4 or `contain` letterboxes it — that was the photo
+     "cropped at the sides". The first fix for that spent the height budget as
+     a width (`45vh`), which keeps the ratio but makes a document-flow image's
+     size a function of viewport *height*. On a desktop that is stable. On a
+     phone it is not: the height changes as the URL bar comes and goes, so the
+     photo resizes on both axes, the caption and the button move with it, and
+     the document height changes underneath a scroll the browser is trying to
+     restore. It read as the page glitching on every refresh, and it was the
+     one difference left between a Mac, where this page settled, and an iPhone,
+     where it did not.
+
+     No height cap now. A 340px-wide photo is 453px tall and the page scrolls
+     on a short window — which is the size George asked to keep. Scrolling is
+     not a defect; moving is. */
+  width: min(100%, 340px);
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-elev);
@@ -2973,6 +3585,19 @@ button.tag.is-mini {
   color: var(--text-strong);
 }
 
+/* The line under the name. Quieter than the name and in the body face rather
+   than the mono one, so the two read as a caption and its aside rather than as
+   two competing headings. */
+.cat-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
 .back-404 {
   display: flex;
   flex-wrap: wrap;
@@ -2982,7 +3607,9 @@ button.tag.is-mini {
   margin: 0;
 }
 .back-404 .btn .arrow { transition: transform 0.15s ease; }
-.back-404 .btn:hover .arrow { transform: translateX(-3px); }
+@media (hover: hover) {
+  .back-404 .btn:hover .arrow { transform: translateX(-3px); }
+}
 
 /* --------------------------------------------------------------------------
    Contact block
@@ -3071,12 +3698,26 @@ button.tag.is-mini {
 }
 
 /* Sortable headers. The chevron is always present at low opacity so it is
-   obvious the column can be sorted before anyone clicks anything. */
+   obvious the column can be sorted before anyone clicks anything.
+
+   The room it sits in is reserved from the first paint, for every column that
+   could be sorted, rather than waiting for the attribute. site.js adds
+   aria-sort to seven of these once the document has parsed, and keying the
+   padding on the attribute meant seven columns each grew by 13.6px a frame
+   after the table first appeared. The ~95px came out of Impact, whose cells
+   visibly reflowed from two lines to three.
+
+   Only the geometry is unconditional. The arrow, the pointer cursor and the
+   text selection lock still wait for aria-sort, because with JavaScript off
+   there is nothing to click and a column advertising a sort it cannot perform
+   is worse than a little unused padding. */
+.adv-table th:not([data-nosort]) {
+  position: relative;
+  padding-right: 1.6rem;
+}
 .adv-table th[aria-sort] {
   cursor: pointer;
   user-select: none;
-  position: relative;
-  padding-right: 1.6rem;
 }
 .adv-table th[aria-sort]::after {
   content: "\2195";                 /* up-down arrow: sortable, unsorted */
@@ -3088,9 +3729,12 @@ button.tag.is-mini {
   opacity: 0.35;
   transition: opacity 0.12s ease, color 0.12s ease;
 }
-.adv-table th[aria-sort]:hover::after,
+
 .adv-table th[aria-sort]:focus-visible::after { opacity: 0.8; }
-.adv-table th[aria-sort]:hover { color: var(--accent); }
+@media (hover: hover) {
+  .adv-table th[aria-sort]:hover::after { opacity: 0.8; }
+  .adv-table th[aria-sort]:hover { color: var(--accent); }
+}
 .adv-table th[aria-sort="ascending"]::after  { content: "\25B2"; opacity: 1; color: var(--accent); font-size: 0.7em; }
 .adv-table th[aria-sort="descending"]::after { content: "\25BC"; opacity: 1; color: var(--accent); font-size: 0.7em; }
 .adv-table th[aria-sort="ascending"],
@@ -3101,7 +3745,22 @@ button.tag.is-mini {
   color: var(--text);
   border: 1px solid var(--border-soft);
 }
-.adv-table tbody tr:hover { background: var(--bg-elev); }
+@media (hover: hover) {
+  /* Tinted apart from the archive rail's hover by weight, not by hue: the
+     rail uses --bg-elev, and a neutral one step heavier reads as a different
+     kind of thing without bringing a colour into a table that is neutral
+     everywhere else. The accent edge on the leading cell carries the "this row
+     is a link" signal.
+
+     On the cells rather than the <tr>, because a table row does not paint its
+     own background over cells that declare one. */
+  .adv-table tbody tr:hover > td {
+    background: color-mix(in srgb, var(--border-soft) 35%, var(--bg));
+  }
+  .adv-table tbody tr:hover > td:first-child {
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+}
 
 .adv-table td.cve {
   font-family: var(--font-mono);
@@ -3119,17 +3778,27 @@ button.tag.is-mini {
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-.adv-table tbody tr:hover .row-anchor,
+
 .row-anchor:focus-visible { opacity: 1; text-decoration: none; }
+@media (hover: hover) {
+  .adv-table tbody tr:hover .row-anchor { opacity: 1; text-decoration: none; }
+}
 
 /* Landing on a row should be unmistakable — the header is sticky, so the row
    also needs clearance to not arrive underneath it. */
 .adv-table tbody tr[id] { scroll-margin-top: 6rem; }
-.adv-table tbody tr:target > td {
+/* Gated on a root class rather than on :target alone, so a click elsewhere on
+   the page can dismiss the highlight. Clearing the fragment with
+   history.replaceState() is not enough on its own: it rewrites location.hash
+   without firing a navigation, and whether that also drops the document's
+   target element is left to the engine. The class is decided here, so both
+   engines behave the same — and with scripting off it is never added, which
+   leaves the plain :target behaviour a deep link needs. */
+html:not(.target-cleared) .adv-table tbody tr:target > td {
   background: var(--accent-bg);
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
-.adv-table tbody tr:target .row-anchor { opacity: 1; }
+html:not(.target-cleared) .adv-table tbody tr:target .row-anchor { opacity: 1; }
 /* Advisory links: one per source, stacked so the column stays narrow.
    Both are underlined — in a dense table, colour alone is too weak a cue
    that a cell is clickable. */
@@ -3145,7 +3814,9 @@ button.tag.is-mini {
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
 }
-.adv-table td.adv-links a:hover { text-decoration-thickness: 2px; }
+@media (hover: hover) {
+  .adv-table td.adv-links a:hover { text-decoration-thickness: 2px; }
+}
 .adv-table td.adv-links a + a { margin-top: 0.3rem; font-size: 0.76rem; }
 
 .adv-table td.writeup a,
@@ -3281,7 +3952,9 @@ body.lb-open { overflow: hidden; }
   border-radius: 50%;
   cursor: pointer;
 }
-.lb-close:hover { background: rgba(255, 255, 255, 0.16); }
+@media (hover: hover) {
+  .lb-close:hover { background: rgba(255, 255, 255, 0.16); }
+}
 .lb-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* --------------------------------------------------------------------------
@@ -3448,7 +4121,6 @@ body.lb-open { overflow: hidden; }
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  margin-left: 0.15rem;
 }
 
 .nav-controls { min-width: auto; }
@@ -3456,14 +4128,18 @@ body.lb-open { overflow: hidden; }
 .nav-search[hidden] { display: none; }
 
 .nav-search.open { flex: 0 1 auto; min-width: 0; }
+/* Closed, the field is zero wide but the form's own gap still sits after the
+   icon — dead space that pushed the theme toggle away and left the hairline
+   between them off-centre. */
+.nav-search:not(.open) { gap: 0; }
 
 .nav-search-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;          /* never shrink; pairs with .theme-toggle */
-  width: 1.9rem;
-  height: 1.9rem;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   padding: 0;
   color: var(--text-muted);
   background: none;
@@ -3472,7 +4148,9 @@ body.lb-open { overflow: hidden; }
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease;
 }
-.nav-search-toggle:hover { color: var(--accent); background: var(--bg-elev); }
+@media (hover: hover) {
+  .nav-search-toggle:hover { color: var(--accent); background: var(--bg-elev); }
+}
 .nav-search-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Collapsed by default and opened only by the icon. `visibility: hidden` keeps
@@ -3524,6 +4202,27 @@ body.lb-open { overflow: hidden; }
   transition-delay: 0s;
 }
 .nav-search-input:focus { outline: none; border-color: var(--accent); }
+
+/* iOS Safari zooms the whole page in when a form control it is focusing has
+   text smaller than 16px; at 16px it focuses in place and raises the keyboard.
+
+   The other way to stop it is `maximum-scale=1` on the viewport meta, which
+   would take pinch-zoom away from every reader on every page to fix one input.
+   Not a trade worth making, and it fails WCAG 1.4.4.
+
+   pointer: coarse rather than a width, because the trigger is the touch
+   keyboard, not the screen size — an iPad at 1024px zooms too. */
+@media (pointer: coarse) {
+  .nav-search-input { font-size: 16px; }
+  /* 16px text needs more room than 13px did before it reads as a query box
+     rather than a slot. Both floors move together — the min is what the field
+     falls back to in a tight row. */
+  .nav-search-input.is-open,
+  .nav-search.open .nav-search-input {
+    width: clamp(9rem, 34vw, 14rem);
+    min-width: 7rem;
+  }
+}
 /* Safari draws its own clear button; it fights the border radius. */
 .nav-search-input::-webkit-search-decoration,
 .nav-search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
@@ -3552,13 +4251,19 @@ body.lb-open { overflow: hidden; }
 .search-form input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 .search-status {
-  min-height: 1.2em;
+  /* A full line, reserved whether or not there is anything to say yet.
+
+     The status is empty in the markup and filled by script, so anything less
+     than a full line — or a margin that only exists once it has content —
+     changes the page height the moment the first result arrives, and the
+     footer moves. One blank line on an untouched search page is the price. */
+  min-height: 1.7em;               /* one line at this font-size */
+  min-height: 1lh;                 /* exact, where supported */
   margin: 0 0 1.5rem;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text-muted);
 }
-.search-status:empty { margin-bottom: 0; }
 
 #search-results mark {
   padding: 0 0.15em;
@@ -3646,6 +4351,14 @@ body.lb-open { overflow: hidden; }
   .adv-table tr,
   .adv-table td { display: block; width: auto; }
 
+  /* The table's own frame goes with the grid it framed. Stacked, every row
+     draws its own card border, so the table's 1px outline is a second box
+     around all of them — and because the last card keeps its 1rem of bottom
+     margin *inside* the table, the outline showed as an empty bordered strip
+     hanging below the last advisory with nothing in it. */
+  .adv-table { border: 0; }
+  .adv-table tbody tr:last-child { margin-bottom: 0; }
+
   /* Headers are the sort control; with the grid gone they have no meaning. */
   .adv-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -3656,7 +4369,22 @@ body.lb-open { overflow: hidden; }
     padding: 0.35rem 0.9rem 0.7rem;
     margin-bottom: 1rem;
   }
-  .adv-table tbody tr:hover { background: var(--bg-elev); }
+  @media (hover: hover) {
+  /* Stacked, each row is already its own card — so it hovers like one, with
+       the same three tokens every other card on the site uses. */
+    .adv-table tbody tr:hover {
+      background: var(--card-hover-bg);
+      border-color: var(--card-hover-border);
+      box-shadow: var(--card-hover-shadow);
+    }
+  .adv-table tbody tr:hover > td { background: transparent; }
+  /* And without the table layout's accent edge. That edge is an inset shadow
+       on the row's leading cell, which in a table is the full height of the row
+       and reads as a bar down its side. Here the leading cell is the CVE at the
+       top of the card, so the same declaration drew a 2px blue tick against one
+       line of it and nothing else. The card's own border carries the signal. */
+    .adv-table tbody tr:hover > td:first-child { box-shadow: none; }
+}
 
   .adv-table td {
     border: 0;
@@ -3720,17 +4448,21 @@ body.lb-open { overflow: hidden; }
   transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 .to-top[hidden] { display: none; }
-.to-top:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  text-decoration: none;
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .to-top:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    text-decoration: none;
+    transform: translateY(-2px);
+  }
 }
 .to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   .to-top { transition: none; }
+  @media (hover: hover) {
   .to-top:hover { transform: none; }
+}
 }
 
 /* --------------------------------------------------------------------------
@@ -3821,8 +4553,10 @@ body.lb-open { overflow: hidden; }
   cursor: pointer;
   transition: transform 0.15s ease;
 }
-.video-facade:hover .video-facade-play,
-.iframe-facade:hover .iframe-facade-play { transform: scale(1.08); }
+@media (hover: hover) {
+  .video-facade:hover .video-facade-play,
+  .iframe-facade:hover .iframe-facade-play { transform: scale(1.08); }
+}
 
 .video-facade-note,
 .iframe-facade-note {
@@ -3865,7 +4599,9 @@ body.lb-open { overflow: hidden; }
 }
 .embed-pdf object + .embed-pdf-card { border-top: 0; }
 .embed-pdf figure > .embed-pdf-card:first-child { border-radius: var(--radius); }
-.embed-pdf-card:hover { border-color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  .embed-pdf-card:hover { border-color: var(--accent); text-decoration: none; }
+}
 .embed-pdf-card svg { flex: none; color: var(--accent); }
 .embed-pdf-card span { display: flex; flex-direction: column; min-width: 0; }
 .embed-pdf-card strong { color: var(--text-strong); font-weight: 600; }
@@ -3943,7 +4679,9 @@ body.lb-open { overflow: hidden; }
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
-.has-addr .highlight .ln:hover .addr { color: var(--text-muted); }
+@media (hover: hover) {
+  .has-addr .highlight .ln:hover .addr { color: var(--text-muted); }
+}
 
 /* ---- screenshots -------------------------------------------------------- */
 /* For screen captures rather than drawings — an IDA graph, a debugger, a crash
@@ -4113,7 +4851,9 @@ body.lb-open { overflow: hidden; }
   vertical-align: super;
   padding: 0 0.15em;
 }
-.sidenote-marker:hover { color: var(--accent-dim); }
+@media (hover: hover) {
+  .sidenote-marker:hover { color: var(--accent-dim); }
+}
 
 /* The toggle is .sr-only rather than hidden, so it keeps its place in the tab
    order — the marker is a <label>, which cannot take focus itself. This puts
@@ -4190,7 +4930,9 @@ body.lb-open { overflow: hidden; }
   user-select: none;
   font-variant-numeric: tabular-nums;
 }
-.ln-num:hover { color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  .ln-num:hover { color: var(--accent); text-decoration: none; }
+}
 .has-lineno .ln:target {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   scroll-margin-top: 6rem;
@@ -4225,7 +4967,9 @@ body.lb-open { overflow: hidden; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-a.pagination-item:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  a.pagination-item:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+}
 .pagination-item.is-current { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 span.pagination-item:not(.is-current) { opacity: 0.4; }
 @media print { .pagination { display: none !important; } }
@@ -4257,9 +5001,12 @@ span.pagination-item:not(.is-current) { opacity: 0.4; }
   opacity: 0;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-.anim:hover .anim-replay,
+
 .anim-replay:focus-visible { opacity: 1; }
-.anim-replay:hover { color: var(--accent); border-color: var(--accent); }
+@media (hover: hover) {
+  .anim:hover .anim-replay { opacity: 1; }
+  .anim-replay:hover { color: var(--accent); border-color: var(--accent); }
+}
 
 @media print { .anim-replay { display: none !important; } }
 
@@ -4283,33 +5030,42 @@ h1, h2, h3,
 .prose li,
 .excerpt p { text-wrap: pretty; }
 
-/* Long posts: let the browser skip layout and paint for sections that are far
-   offscreen. contain-intrinsic-size gives it a height estimate so the
-   scrollbar does not jump around as it renders. Measured on the 8000px embed
-   reference page — this is the one that carries 13 figures. */
-.prose > h2 { content-visibility: auto; contain-intrinsic-size: auto 2px; }
-.prose .embed,
-.prose div.highlighter-rouge {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 420px;
-}
-/* Never on print: content-visibility would omit un-rendered sections. */
-@media print {
-  .prose > h2, .prose .embed, .prose div.highlighter-rouge { content-visibility: visible; }
-}
+/* `content-visibility: auto` was here, on embeds and code blocks, to let the
+   browser skip layout and paint for sections far offscreen. It is gone, and
+   the reason is that it caused the thing it was added to prevent.
 
-/* Cross-document view transitions. Chrome and Edge animate between pages;
-   every other browser ignores the at-rule and navigates normally. Kept to a
-   short cross-fade — anything showier gets tiresome by the third click. */
-@view-transition { navigation: auto; }
+   The estimate has to be a single number, and a post's blocks are not one
+   height. Every one of them was guessed at 420px and then collapsed to its
+   real size as it rendered, so the document *shrank* after first paint —
+   measured at 4621px to 4293px, 2683px to 2017px, 21870px to 21404px on the
+   longer drafts. The footer rose by up to 700px under the reader, Chromium
+   scored the shift at up to 0.281 (0.1 is already "needs improvement"), and a
+   refresh restored a scroll position computed against the old height into a
+   document that was still collapsing, landing up to 328px away from where the
+   reader had been.
 
-::view-transition-old(root),
-::view-transition-new(root) { animation-duration: 180ms; }
+   Removing the two declarations cut the load-time defects on the two CVE
+   drafts from 64 to 17: height-changed-after-restore 12 to 2, landmarks moved
+   44 to 12, stepped restorations 3 to 0.
 
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) { animation: none; }
-}
+   The cost is real — long posts do more layout up front — but it is paid once
+   per load, whereas the shift was paid in front of the reader every time. If
+   it is ever wanted back, it needs per-block heights rather than one constant;
+   `auto` remembers the true size, so only the first visit is wrong, and only
+   the first visit is what anyone sees. */
+
+
+/* No cross-document view transitions here, deliberately.
+
+   `@view-transition { navigation: auto; }` needs the opt-in to be
+   render-blocking on the *incoming* document to have any effect; without that
+   the transition is skipped on every navigation and Chrome reports the
+   skipped promise as an uncaught error, which the page cannot catch because
+   the opt-in is declarative and nothing here calls startViewTransition.
+
+   To restore, add that one line back along with the
+   ::view-transition-old/new(root) rules that shaped it — and make the opt-in
+   render-blocking at the same time. */
 
 /* The scrollbar should match the page, not flash white on a dark theme.
    Paired with <meta name="color-scheme">, which handles it before first paint. */
@@ -4356,10 +5112,12 @@ h1, h2, h3,
   border-radius: var(--radius);
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
-.related a:hover {
-  border-color: var(--accent);
-  text-decoration: none;
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .related a:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+    transform: translateY(-2px);
+  }
 }
 .related-why {
   font-family: var(--font-mono);
@@ -4382,9 +5140,87 @@ h1, h2, h3,
 }
 @media (prefers-reduced-motion: reduce) {
   .related a { transition: none; }
+  @media (hover: hover) {
   .related a:hover { transform: none; }
 }
+}
 @media print { .related { display: none !important; } }
+
+/* --------------------------------------------------------------------------
+   Press feedback on touch
+
+   Every hover rule in this file is now behind `@media (hover: hover)`, because
+   a touchscreen has no pointer to move away: iOS Safari applies :hover to
+   whatever was last tapped and leaves it there until something else is
+   tapped. The search icon kept its chip after the panel closed, an advisory
+   card stayed lifted after you had moved on.
+
+   Guarding them alone would leave touch with no feedback at all, so the press
+   takes over the job. Same tokens the hover states use — the same signal,
+   only it lasts as long as the finger does.
+
+   Backgrounds and colours rather than opacity, deliberately: :active applies
+   to the whole activation chain, so a link inside a card matches at both
+   levels, and two stacked opacities would darken the card twice as much as
+   either rule asked for.
+   -------------------------------------------------------------------------- */
+
+@media (hover: none) {
+  /* Whole-card surfaces. */
+  .post-item:active,
+  .card-link:active,
+  .featured:active,
+  .adv-table tbody tr:active {
+    background: var(--card-hover-bg);
+    border-color: var(--card-hover-border);
+  }
+
+  /* Icon buttons in the bar and the corner. */
+  .nav-toggle:active,
+  .nav-search-toggle:active,
+  .theme-toggle:active,
+  .to-top:active,
+  .socials a:active {
+    color: var(--accent);
+    background: var(--bg-elev);
+  }
+
+  /* Outlined controls. */
+  .btn:active,
+  .tag:active {
+    border-color: var(--card-hover-border);
+    background: var(--card-hover-bg);
+  }
+
+  /* Plain text links, where colour is the only thing to change. */
+  .prose a:active,
+  .nav-link:active,
+  .site-footer a:active,
+  .toc a:active {
+    color: var(--accent);
+  }
+}
+
+/* Outside the query above, deliberately. A laptop with a touchscreen matches
+   `hover: hover`, so anything about touch that lives in a `hover: none` block
+   never reaches it — and both of these are about the finger, not the pointer.
+   Neither does anything at all on a device without one. */
+a, button, summary, [role="button"], .post-item, .adv-table tbody tr, .card-link {
+  /* Tapping the search icon twice — open, then close — is two taps inside the
+     double-tap window, so iOS zoomed the page instead of closing the field.
+     `manipulation` says this element handles taps and scrolls but has no
+     double-tap gesture of its own, which drops the zoom and the 300ms wait
+     the browser used to spend deciding.
+
+     This is the narrow fix. The blunt one is `user-scalable=no` on the viewport
+     meta, which would take pinch-zoom away from every reader on every page to
+     settle one gesture on the controls, and fails WCAG 1.4.4. The viewport meta
+     stays `width=device-width, initial-scale=1`. */
+  touch-action: manipulation;
+  /* iOS paints its own grey rectangle over a tapped element. With a press
+     state of our own that is a second, uglier flash on top of the first. */
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* --------------------------------------------------------------------------
    Trailing margins

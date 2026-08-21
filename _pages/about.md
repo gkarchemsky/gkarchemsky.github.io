@@ -12,10 +12,6 @@ description: >-
 head_rule: false      # no line under the heading — see _layouts/page.html
 ---
 
-{%- comment -%}
-  One paragraph, broken with <br>: two sentences of the same introduction, so a
-  paragraph gap between them read as two unrelated statements.
-{%- endcomment -%}
 My name is George Karchemsky, and this is my personal blog.<br>
 I&rsquo;m a vulnerability researcher based in Israel.
 {: .tight-lines}

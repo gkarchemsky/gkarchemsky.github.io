@@ -10,12 +10,6 @@ description: Write-ups on vulnerability research and exploitation.
     <p class="lede">Everything I have written, newest first.</p>
   </header>
 
-  {%- comment -%}
-    CTF write-ups have their own page and their own archive, so this list is
-    everything else. Built with a loop rather than `where_exp`, because Liquid
-    cannot negate `contains` — `"p.categories contains 'ctf' == false"` parses
-    and then quietly matches nothing.
-  {%- endcomment -%}
   {%- assign blog_posts = "" | split: "" -%}
   {%- for p in site.posts -%}
     {%- unless p.categories contains 'ctf' -%}
@@ -26,20 +20,7 @@ description: Write-ups on vulnerability research and exploitation.
   <div class="page-shell">
   <div>
   {%- if blog_posts.size > 0 -%}
-  {%- comment -%}
-    data-paginate turns on client-side paging in site.js. Every post is
-    still rendered into the HTML, so search engines and readers without
-    JavaScript get the complete list.
-  {%- endcomment -%}
   <ul class="post-list is-grouped" data-paginate="10">
-    {%- comment -%}
-      Year, then month nested inside it. Both are aria-hidden: every post
-      already carries its full date in .meta, so to a screen reader these
-      would only be duplication. They are a visual index, not content.
-
-      current_month is reset with the year so that, say, February 2026 and
-      February 2025 both get their own heading.
-    {%- endcomment -%}
     {%- assign current_year = "" -%}
     {%- assign current_month = "" -%}
     {%- for post in blog_posts -%}
@@ -70,14 +51,10 @@ description: Write-ups on vulnerability research and exploitation.
     {%- endfor %}
   </ul>
   {%- else -%}
-  <p class="empty">No posts published yet &mdash; the first write-up is in progress.</p>
+  <p class="empty">No posts published yet &mdash; the first one is in progress.</p>
   {%- endif -%}
   </div>
 
-  {%- comment -%}
-    The complete archive beside the paged list. /blog/ shows 10 at a time, so
-    from the 11th post on this is the only way to see everything at once.
-  {%- endcomment -%}
   {%- include archive-rail.html posts=blog_posts -%}
   </div>
 </div>

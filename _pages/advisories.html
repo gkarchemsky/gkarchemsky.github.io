@@ -11,31 +11,16 @@ description: CVEs and security advisories from my research.
   </header>
 
   {%- if site.data.advisories and site.data.advisories.size > 0 -%}
-  {%- comment -%}
-    Grouped by disclosure year, newest first, so the list stays navigable as
-    it grows. Each year sorts independently.
-  {%- endcomment -%}
   {%- assign by_year = site.data.advisories | group_by_exp: "a", "a.date | date: '%Y'" | sort: "name" | reverse -%}
   {%- for year in by_year %}
-  {%- comment -%}
-    An entry with no `date:` lands in a group whose name is the empty string,
-    which rendered as a bare `<h2 class="adv-year"></h2>`.
-  {%- endcomment -%}
   {%- assign adv_year = year.name | default: "Undated" -%}
   {%- if adv_year == "" %}{% assign adv_year = "Undated" %}{% endif -%}
   <h2 class="adv-year" id="adv-{{ adv_year | slugify }}">{{ adv_year }}</h2>
-  {%- comment -%}
-    tabindex="0" and a name: this box scrolls sideways on a narrow screen, and
-    a scroll container that cannot take focus cannot be scrolled by keyboard at
-    all (WCAG 2.1.1). Naming it also distinguishes one year's table from the
-    next — they have identical headers, so without this a screen-reader user
-    has no way to tell which year they are reading.
-  {%- endcomment -%}
   <div class="table-scroll" tabindex="0" role="region" aria-labelledby="adv-{{ adv_year | slugify }}">
     <table class="adv-table">
       <thead>
         <tr>
-          <th scope="col">CVE</th>
+          <th scope="col" aria-sort="ascending">CVE</th>
           <th scope="col">Vendor</th>
           <th scope="col">Component</th>
           <th scope="col">Impact</th>
@@ -43,30 +28,25 @@ description: CVEs and security advisories from my research.
           <th scope="col">Fixed in</th>
           <th scope="col">Advisory</th>
           <th scope="col">Disclosed</th>
-          {%- comment -%}
-            Opted out of sorting. This column holds one link per row and
-            nothing else, so ordering by it sorts by link text — which is the
-            same word every time. The header offered an affordance that could
-            not tell the reader anything. Every other column keeps it.
-          {%- endcomment -%}
           <th scope="col" data-nosort>Write-up</th>
         </tr>
       </thead>
       <tbody>
-        {%- for a in year.items %}
+        {%- assign keyed = "" | split: "" -%}
+        {%- for a in year.items -%}
+          {%- assign n = a.cve | split: '-' | last -%}
+          {%- assign k = "0000000000" | append: n | slice: -10, 10 -%}
+          {%- assign k = k | append: '|' | append: a.cve -%}
+          {%- assign keyed = keyed | push: k -%}
+        {%- endfor -%}
+        {%- assign keyed = keyed | sort -%}
+        {%- for key in keyed %}
+        {%- assign this_cve = key | split: '|' | last -%}
+        {%- assign a = year.items | where: "cve", this_cve | first -%}
         {%- assign ap = a.apple -%}
         {%- assign z = a.zdi -%}
-        {%- comment -%}
-          Apple's advisory has no per-CVE anchors, so the link uses a text
-          fragment to scroll straight to the entry. Hyphens are percent-encoded
-          because `-` is meaningful in the text-fragment grammar.
-        {%- endcomment -%}
         {%- assign cve_frag = a.cve | replace: '-', '%2D' -%}
 
-        {%- comment -%}
-          Each row is addressable: /advisories/#cve-2026-20675 scrolls to it and
-          highlights it. The id lives on the row so sorting cannot break it.
-        {%- endcomment -%}
         {%- assign row_id = a.cve | downcase -%}
 
         <tr id="{{ row_id }}">
@@ -75,13 +55,6 @@ description: CVEs and security advisories from my research.
             <a class="row-anchor" href="#{{ row_id }}"
                aria-label="Link to {{ a.cve }}" title="Link to this advisory">#</a>
           </td>
-          {%- comment -%}
-            Every cell defaults. product, impact and fixed_in did not, so an
-            entry added before its Apple advisory is public — which is the
-            normal state for a few weeks — rendered blank cells beside
-            defaulted ones, reading as a broken table rather than an
-            incomplete one.
-          {%- endcomment -%}
           <td data-label="Vendor">{{ a.vendor | default: "—" }}</td>
           <td data-label="Component">{{ a.product | default: ap.component | default: "—" }}</td>
           <td class="impact" data-label="Impact">{{ ap.impact | default: "—" }}</td>
@@ -97,17 +70,7 @@ description: CVEs and security advisories from my research.
             {%- elsif z.id -%}{{ z.id }}
             {%- else -%}<span class="pending">&mdash;</span>{%- endif -%}
           </td>
-          {%- comment -%}
-            Displayed in the site's reading format, but data-sort carries ISO
-            so the column sorts chronologically. Without it the sort would be
-            alphabetical on the month name — April before January.
-          {%- endcomment -%}
           <td class="date" data-label="Disclosed" data-sort="{{ a.date | date: '%Y-%m-%d' }}">{{ a.date | date: site.date_format }}</td>
-          {%- comment -%}
-            `post` may point at a write-up that is still a draft, so link only
-            when a post with that URL actually exists. The link appears by
-            itself the moment the draft is published.
-          {%- endcomment -%}
           {%- assign writeup = site.posts | where: "url", a.post | first -%}
           <td class="writeup" data-label="Write-up">
             {%- if writeup -%}
@@ -117,7 +80,6 @@ description: CVEs and security advisories from my research.
             {%- endif -%}
           </td>
         </tr>
-
 
         {%- endfor %}
       </tbody>

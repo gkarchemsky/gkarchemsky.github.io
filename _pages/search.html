@@ -2,33 +2,15 @@
 layout: default
 title: Search
 permalink: /search/
-description: Search every write-up on the site by title, tag and summary — research posts and CTF solutions alike, filtered as you type.
+description: Search the whole site — write-ups, advisories and every section page — by title, tag and text, filtered as you type.
 ---
-{%- comment -%}
-  Everything happens client-side against /search.json. Without JavaScript the
-  form is useless, so the page says so and points at the two browsable indexes
-  rather than leaving an input that silently does nothing.
-
-  The nav link appears only while this page exists, the same way /tags/ works.
-{%- endcomment -%}
 <div class="wrap">
   <header class="page-head">
     <h1>Search</h1>
   </header>
 
-  {%- comment -%}
-    Named, because the header carries a `role="search"` landmark too and this
-    page therefore has two of them. Duplicate landmarks of one role have to be
-    distinguishable, or a screen-reader user picking "search" from the landmark
-    list cannot tell which one they are about to land in.
-
-    `autofocus` stays. It is the one page on the site whose entire purpose is
-    this input — the heading says "Search" and there is nothing else here — and
-    every search engine behaves the same way. The usual objection, that it
-    front-runs the skip link, assumes a page with content to skip to.
-  {%- endcomment -%}
-  <form class="search-form" role="search" aria-label="Search write-ups" onsubmit="return false;">
-    <label class="sr-only" for="q">Search write-ups</label>
+  <form class="search-form" role="search" aria-label="Search the site" onsubmit="return false;">
+    <label class="sr-only" for="q">Search the site</label>
     <input type="search" id="q" name="q" autocomplete="off" autofocus
            aria-describedby="search-status">
   </form>
