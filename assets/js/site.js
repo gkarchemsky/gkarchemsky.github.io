@@ -192,50 +192,6 @@
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
-  /* ------------------------------------------------------- tab icon ---- */
-  /* The favicon follows the site's theme, not the operating system's.
-   *
-   * assets/img/favicon.svg carries its own `prefers-color-scheme` rule, which
-   * is the right fallback with JavaScript off — but that rule is evaluated by
-   * the browser chrome, which knows nothing about this site's toggle. Switch
-   * the site to light while the OS is dark and the tab icon stayed dark.
-   *
-   * So the artwork is re-emitted here as a data: URI with the colours already
-   * chosen. Same geometry as the file; only the two colours differ, and they
-   * are the same pair the stylesheet uses.
-   *
-   * The <link> is replaced rather than re-pointed: several browsers ignore an
-   * href change on an existing icon element and keep painting the old one. */
-  function faviconFor(theme) {
-    var bg = theme === 'dark' ? '#0b0d10' : '#ffffff';
-    var fg = theme === 'dark' ? '#3cd3fe' : '#007eae';
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
-      + '<rect width="64" height="64" rx="13" fill="' + bg + '"/>'
-      + '<path d="M16 21 L29 32 L16 43" fill="none" stroke="' + fg + '"'
-      + ' stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<rect x="36" y="40" width="14" height="6" rx="1" fill="none"'
-      + ' stroke="' + fg + '" stroke-width="6"/>'
-      + '</svg>';
-  }
-
-  var faviconTheme = '';
-  function syncFavicon() {
-    var theme = effectiveTheme();
-    if (theme === faviconTheme) return;   /* nothing to repaint */
-    faviconTheme = theme;
-    var link = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
-    if (!link) return;
-    var next = link.cloneNode(false);
-    next.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(faviconFor(theme)));
-    link.parentNode.replaceChild(next, link);
-  }
-  syncFavicon();
-  /* Outside the toggle block on purpose: with no explicit choice stored the
-     icon still has to follow the OS, and that is true whether or not the
-     button happens to exist on the page. */
-  var faviconOS = window.matchMedia('(prefers-color-scheme: dark)');
-  if (faviconOS.addEventListener) faviconOS.addEventListener('change', syncFavicon);
-
   var toggle = document.querySelector('.theme-toggle');
   if (toggle) {
     /* Which theme is on was shown by swapping a sun icon for a moon — visual
@@ -264,7 +220,6 @@
       root.setAttribute('data-theme', next);
       try { localStorage.setItem('theme', next); } catch (e) {}
       syncPressed();
-      syncFavicon();
 
       // The giscus iframe is configured to follow the OS, which is wrong the
       // moment this toggle disagrees with it. Tell it explicitly.
