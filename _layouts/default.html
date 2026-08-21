@@ -46,20 +46,18 @@
   <link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}?v={{ v }}">
   {%- feed_meta -%}
 
-  {%- assign feed_ok = false -%}
-  {%- if page.feed -%}
-    {%- if page.feed_category -%}
-      {%- assign feed_posts = site.posts | where_exp: "p", "p.categories contains page.feed_category" -%}
-      {%- if feed_posts.size > 0 %}{% assign feed_ok = true %}{% endif -%}
-    {%- else -%}
-      {%- assign feed_ok = true -%}
-    {%- endif -%}
-  {%- endif -%}
-  {%- if feed_ok -%}
-  <link rel="alternate" type="application/atom+xml"
-        title="{{ site.title }} — {{ page.title }}"
-        href="{{ page.feed | absolute_url }}">
-  {%- endif -%}
+  {%- comment -%}
+    No per-page feed link. `feed_meta` above already advertises /feed.xml on
+    every page, and that is now the only feed.
+
+    This block emitted a second <link> for any page declaring `feed:` in its
+    front matter — only /ctf/ ever did, for /feed/ctf.xml — and it guarded that
+    link behind "does the category actually have posts", so a reader was never
+    handed an empty feed. If a category feed is wanted again, both halves have
+    to come back together: the `categories:` list in _config.yml that generates
+    the file, and a guard like this one so it is only advertised once it has
+    something in it.
+  {%- endcomment -%}
 
   <link rel="search" type="application/opensearchdescription+xml"
         href="{{ '/opensearch.xml' | relative_url }}" title="{{ site.title }}">

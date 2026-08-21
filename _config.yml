@@ -161,11 +161,11 @@ plugins:
 
 feed:
   path: /feed.xml
-  # jekyll-feed generates one extra feed per category listed here, at
-  # /feed/<category>.xml. /feed.xml stays the canonical, everything feed —
-  # it is the one in <head> that readers and crawlers autodiscover.
-  categories:
-    - ctf
+  # One feed, deliberately. jekyll-feed will generate an extra per-category
+  # feed for anything listed under `categories:` here — /feed/ctf.xml existed
+  # that way. It was unlisted, unlinked and undiscoverable, so nothing was
+  # subscribing to it, and a second feed is a second thing to keep correct.
+  # /feed.xml carries everything and is the one <head> advertises.
 
 # NOT in effect, and kept only so nobody re-adds it expecting results.
 # jekyll-sass-converter compiles .scss/.sass; assets/css/main.css is plain CSS
