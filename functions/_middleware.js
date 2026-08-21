@@ -15,8 +15,9 @@
  *
  * 2. It must not fingerprint readers. No IP address, no raw User-Agent, no
  *    full referrer URL. What is kept is deliberately coarse: which country,
- *    which *class* of client, and which host linked here. That is enough to
- *    answer "is anyone reading this" without building a profile of who.
+ *    which network, which *class* of client, and which host linked here.
+ *    That is enough to answer "is anyone reading this" without building a
+ *    profile of who.
  */
 
 /* Client classes, tested in this order because the patterns overlap:
@@ -34,15 +35,44 @@ function agentClass(ua) {
   return 'browser';
 }
 
+/* Paths that only an attacker asks for.
+ *
+ * Classifying by *what was requested* rather than by who claims to be asking
+ * is the point: within three minutes of this log going live, a scanner walked
+ * .env, .env.local, .env.production, api/config, config.json and friends —
+ * and because it sent a browser User-Agent, agentClass() above called it a
+ * browser. It was a fifth of all traffic that hour. Left unclassified it
+ * inflates exactly the two numbers worth trusting, page views and browsers.
+ *
+ * Anchored at the start of the path so a legitimate asset is never caught:
+ * /assets/vendor/... is ours, /vendor/... is somebody looking for a PHP
+ * autoloader. Nothing this site serves matches, which is the test to re-run
+ * before adding a pattern here. */
+const PROBE = new RegExp('^/(?:' + [
+  '\\.env', '\\.git', '\\.aws', '\\.ssh', '\\.svn', '\\.htaccess', '\\.DS_Store',
+  'wp-', 'wordpress', 'xmlrpc\\.php', 'phpmyadmin', 'phpinfo',
+  'admin', 'administrator', 'cgi-bin', 'vendor/',
+  'api/(?:env|config|v[0-9]+/config)',
+  'config(?:\\.js|\\.json|\\.php|\\.yml|\\.yaml)?$',
+  'settings\\.(?:js|json|php)$',
+  'js/(?:env|config)\\.js$',
+  'credentials', 'secrets?(?:\\.|$|/)', 'backup', 'dump\\.sql',
+  'server-status', 'actuator', 'telescope', 'debug(?:\\.|$|/)',
+  'owa/', 'autodiscover', 'boaform', 'shell', 'eval-stdin\\.php',
+].join('|') + ')', 'i');
+
 /* What was asked for, rather than which URL. Lets a query separate "someone
-   read a post" from "something pulled the feed" without string-matching paths
-   at query time. */
+   read a post" from "something pulled the feed" from "something went looking
+   for credentials", without string-matching paths at query time. */
 function requestKind(path) {
+  /* Our own endpoints first — these are definitively the site's, so no probe
+     pattern can ever shadow one. */
   if (path === '/feed.xml') return 'feed';
   if (path === '/search.json') return 'search-index';
   if (path === '/sitemap.xml' || path === '/robots.txt') return 'crawl-meta';
-  if (path.startsWith('/assets/')) return 'asset';
   if (path === '/opensearch.xml') return 'opensearch';
+  if (path.startsWith('/assets/')) return 'asset';
+  if (PROBE.test(path)) return 'probe';
   return 'page';
 }
 
@@ -58,6 +88,7 @@ export const onRequest = async (context) => {
     if (env && env.BLOG_ANALYTICS) {
       const url = new URL(request.url);
       const path = url.pathname;
+      const cf = request.cf || {};
 
       /* Referrer host only. The full URL can carry search terms and private
          paths from whatever site linked here, and none of that is ours to
@@ -68,19 +99,25 @@ export const onRequest = async (context) => {
         try { refHost = new URL(ref).host; } catch (e) { refHost = 'unparseable'; }
       }
 
-      const ua = request.headers.get('user-agent') || '';
-      const agent = agentClass(ua);
-
       env.BLOG_ANALYTICS.writeDataPoint({
         blobs: [
           path.slice(0, 200),                            /* blob1  what was requested */
-          requestKind(path),                             /* blob2  page | feed | asset | ... */
-          agent,                                         /* blob3  browser | feed-reader | bot | ai | none */
-          request.cf && request.cf.country || 'XX',      /* blob4  country, coarse by design */
+          requestKind(path),                             /* blob2  page | feed | asset | probe | ... */
+          agentClass(request.headers.get('user-agent') || ''),
+                                                         /* blob3  browser | feed-reader | bot | ai | none */
+          cf.country || 'XX',                            /* blob4  country, coarse by design */
           refHost.slice(0, 120),                         /* blob5  who linked here */
           request.method,                                /* blob6 */
           url.hostname,                                  /* blob7  apex vs www */
           (response.headers.get('content-type') || '').split(';')[0], /* blob8 */
+
+          /* Which network, not which machine. A request from a hosting
+             provider is a bot however its User-Agent is dressed; a request
+             from a consumer or mobile ISP is a person. That distinction is
+             most of the forensic value of an IP address, and this carries it
+             without ever storing one. */
+          String(cf.asn || ''),                          /* blob9  e.g. "14061" */
+          String(cf.asOrganization || '').slice(0, 120), /* blob10 e.g. "DigitalOcean" */
         ],
         doubles: [
           response.status,                               /* double1 */
@@ -90,7 +127,7 @@ export const onRequest = async (context) => {
            at high volume. Client class is the low-cardinality field whose
            proportions must stay honest — losing the true browser-to-bot
            ratio would make every other number misleading. */
-        indexes: [agent],
+        indexes: [agentClass(request.headers.get('user-agent') || '')],
       });
     }
   } catch (e) {
