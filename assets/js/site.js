@@ -297,11 +297,6 @@
     var hamburger = hdr.querySelector('.nav-toggle');
     if (!wrap || !brand || !navEl || !controls) return;
 
-    /* Clearance demanded on top of the row's own two 2rem gaps, which already
-       guarantee the controls never touch anything. This is only a margin for
-       sub-pixel and font-metric variance, so it is small: at 24px it was a
-       third of the reason the bar collapsed while it still had room. */
-    var MIN_GAP = 8;
     var HYSTERESIS = 48;     /* extra room demanded before expanding again */
     var navWidth = 0;        /* natural inline width of the links, once seen */
     var collapsedAtRail = 0; /* rail width when the bar last collapsed */
@@ -337,37 +332,61 @@
        up), and the two gaps between them. */
     var field = hdr.querySelector('.nav-search-input');
 
-    /* How much the control group can give back before anything else has to.
-       The open search field shrinks to a floor (min-width on
-       .nav-search-input), so this much of its current width is not a real
-       claim on the row — it is slack. */
-    var controlSlack = function () {
-      if (!field) return 0;
-      var now = field.getBoundingClientRect().width;
-      if (!now) return 0;                 /* closed: nothing to give */
-      var min = parseFloat(window.getComputedStyle(field).minWidth) || 0;
-      return Math.max(0, now - min);
+    /* The two numbers the bar is decided from, read from the stylesheet so they
+       are declared in one place — see --search-w and --nav-clearance on
+       .site-header .wrap. Custom properties come back as their token text
+       ("12rem"), not as resolved pixels, so rem is converted here. Reading them
+       live also means a reader's text zoom moves the thresholds with the type,
+       which is what should happen. */
+    var remPx = function () {
+      return parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+    };
+    var token = function (name, fallbackRem) {
+      var raw = window.getComputedStyle(wrap).getPropertyValue(name).trim();
+      var n = parseFloat(raw);
+      if (isNaN(n)) return fallbackRem * remPx();
+      return /rem\s*$/.test(raw) ? n * remPx() : n;
     };
 
-    /* True while a close is in flight: the class says shut, the field is still
-       most of its open width, and it will not be for much longer. Any decision
-       taken now is taken against a row that is about to change by up to 190px.
-       Only the expanding direction has to care — collapsing early, while the
-       field is on its way open, is the point. */
-    var fieldSettling = function () {
-      return !!field && !hdr.classList.contains('search-open')
-             && field.getBoundingClientRect().width > 1;
+    var gapPx = function () {
+      return parseFloat(window.getComputedStyle(wrap).columnGap) || 0;
     };
 
-    var fits = function (slack) {
-      var gap = parseFloat(window.getComputedStyle(wrap).columnGap) || 0;
+    /* What the control group measures with the field shut.
+    
+       This is the number the row is planned against, and it has to be the
+       *closed* one for both decisions below: the menu must not change because
+       the search opened, and the field cannot be asked whether it fits by
+       measuring a row that already contains it.
+    
+       Three states to normalise. Shut, the group is already the right width.
+       Open as a card, the field is absolutely positioned and out of flow, so
+       the group is again the right width. Open inline, its width has to come
+       back out — leaving the form's own 0.35rem gap, which overstates by 6px
+       in the safe direction. */
+    var controlsClosed = function () {
+      var w = controls.getBoundingClientRect().width;
+      if (!field) return w;
+      if (hdr.classList.contains('search-panel')) return w;
+      if (!hdr.classList.contains('search-open')) return w;
+      return w - field.getBoundingClientRect().width;
+    };
+
+    /* DECISION 1 — the menu.
+    
+       Taken from the closed row and nothing else. Opening the search used to
+       feed into this through controlSlack(), which tried to guess how much of
+       the open field's width the row could claw back; between 1060 and 1120px
+       the guess came out short and the full menu collapsed into a hamburger the
+       moment you clicked search. A decision that does not know the field is
+       open cannot be changed by opening it. */
+    var menuFits = function (extra) {
+      var gap = gapPx();
       var need = brand.scrollWidth
         + gap + navWidth
-        + gap + controls.getBoundingClientRect().width
-        /* Measuring the group as it stands overstates the case: an open
-           field can give back everything above its own min-width. */
-        - controlSlack();
-      return need + (slack || 0) <= railWidth();
+        + gap + controlsClosed()
+        + token('--nav-clearance', 3);
+      return need + (extra || 0) <= railWidth();
     };
 
     /* ------------------------------------------------- panel fallback ----- */
@@ -378,85 +397,31 @@
        this is only here so a resize that lands on the threshold cannot flap. */
     var PANEL_SLACK = 16;
 
-    /* Below the breakpoint only. Above it the links are inline and
-       .nav-collapsed is the mechanism that makes room — two of them competing
-       over one row would fight. Keeping the two in separate width ranges keeps
-       them out of each other's way. */
-    var barIsCompact = widthRuleOwns;
-
-    /* The width an open field refuses to go below, learned once at startup.
-
-       A closed field reports min-width 0, because the floor is declared in the
-       .is-open rule — so the value has to be read while briefly wearing that
-       class, with transitions switched off inline. getComputedStyle forces a
-       style recalculation, and a recalculation is what gives a transition a
-       value to start from; without the `none` this queues a real animation. The
-       reflow before restoring commits the closed state while it is still off. */
-    var fieldFloorPx = 0;
-    var openFieldFloor = function () {
-      if (fieldFloorPx) return fieldFloorPx;
-      if (!field) return 0;
-      var had = field.classList.contains('is-open');
-      var prev = field.style.transition;
-      field.style.transition = 'none';
-      if (!had) field.classList.add('is-open');
-      var w = parseFloat(window.getComputedStyle(field).minWidth) || 0;
-      if (!had) field.classList.remove('is-open');
-      void field.offsetWidth;
-      field.style.transition = prev;
-      fieldFloorPx = w;
-      return w;
-    };
-
-    /* Where the control group ends up once the field has finished opening, not
-       where it happens to be mid-animation. Its min-width is where an open
-       field settles in a tight row, so that is the number the row is planned
-       against from the first frame. */
-    var controlsAtFieldFloor = function () {
-      var w = controls.getBoundingClientRect().width;
-      if (!field) return w;
-      var min = Math.max(parseFloat(window.getComputedStyle(field).minWidth) || 0,
-                         openFieldFloor());
-      return w - field.getBoundingClientRect().width + min;
-    };
-
-    /* What the control group needs, captured only at the two moments the
-       measurement can be believed.
-
-       As a panel the field is absolutely positioned and as wide as the bar, so
-       subtracting it the way controlsAtFieldFloor() does gives a negative
-       number. And with the field open in the bar, .nav-controls carries
-       `min-width: 0` and has already been crushed by the row it no longer fits
-       — reading it there answers "how much room is it being given", not "how
-       much does it need", and the two differ by exactly the amount that would
-       have told us to change shape. Narrowing a window with the field open
-       stayed in the bar for that reason: the group measured small because it
-       was being squeezed, which read as proof that it fitted.
-
-       With the field shut and in the bar there is no squeeze and no absolute
-       positioning, so that reading is the true one and it is the one kept. It
-       is a stable thing to hold on to: with the field discounted to its floor,
-       the group is a separator, two icon buttons and their gaps, none of which
-       vary with the width of the window. */
-    var controlsW = 0;
-    var controlsFloor = function () {
-      var trustworthy = !hdr.classList.contains('search-panel')
-                     && !hdr.classList.contains('search-open');
-      /* Nothing cached yet beats nothing at all — after forgetCachedWidths()
-         the first question may arrive with the field open. */
-      if (trustworthy || !controlsW) controlsW = controlsAtFieldFloor();
-      return controlsW;
-    };
-
-    /* Can one row hold the wordmark, the menu button and the controls at the
-       narrowest the open field will go? Same shape as fits(), minus the nav
-       links, which are in the panel whenever this is asked. */
-    var oneRowHolds = function (slack) {
-      var gap = parseFloat(window.getComputedStyle(wrap).columnGap) || 0;
+    /* DECISION 2 — the shape of the field.
+    
+       Inline if its declared width and the clearance both still fit beside
+       whatever the row is showing right now; otherwise it drops as the card.
+       The card takes no room in the row, so the alternative to "it fits" is
+       never "squeeze something", which is why the field no longer needs a
+       min-width to be crushed back to.
+    
+       Note this asks about the row *as it stands*, hamburger or full menu.
+       That is deliberate and has a visible consequence: widening past the point
+       where the nav links appear can move the field from inline to card,
+       because the links take the room it was using. The alternative — always
+       reserving space for the links — would deny an inline field to every
+       width below 1256px, including the ones with obvious room for it. */
+    var fieldFitsInline = function (extra) {
+      var gap = gapPx();
+      var menuPart = hdr.classList.contains('nav-collapsed') || widthRuleOwns()
+        ? (hamburger ? hamburger.getBoundingClientRect().width : 0)
+        : navWidth;
       var need = brand.scrollWidth
-        + gap + (hamburger ? hamburger.getBoundingClientRect().width : 0)
-        + gap + controlsFloor();
-      return need + (slack || 0) <= railWidth();
+        + gap + menuPart
+        + gap + controlsClosed()
+        + token('--search-w', 12)
+        + token('--nav-clearance', 3);
+      return need + (extra || 0) <= railWidth();
     };
 
     /* Every cached number here is in pixels, and a reader changing their text
@@ -492,8 +457,6 @@
     function forgetCachedWidths() {
       navWidth = 0;
       collapsedAtRail = 0;
-      controlsW = 0;
-      fieldFloorPx = 0;
       hdr.classList.remove('nav-collapsed');
     }
 
@@ -535,11 +498,22 @@
       setTimeout(function () { hdr.classList.remove('shape-switch'); }, 0);
     }
 
+    /* No width restriction here any more, and that is the change.
+    
+       This used to run only below 1040px, on the reasoning that above it the
+       links were inline and .nav-collapsed was the mechanism that made room —
+       two of them competing over one row would fight. They no longer compete:
+       the menu is decided from the closed row and cannot be moved by the
+       field, so the field is free to take whichever shape fits wherever it is.
+    
+       The consequence is that the card is not a narrow-screen treatment. It is
+       what happens whenever the row cannot spare --search-w, which includes
+       wide windows where the nav links have taken the space — between roughly
+       1080px and 1300px the bar shows the full menu and the card together. */
     function measureFieldShape() {
-      if (!barIsCompact()) { setPanelMode(false); return; }
       if (hdr.classList.contains('search-panel')) {
-        if (oneRowHolds(PANEL_SLACK)) setPanelMode(false);
-      } else if (!oneRowHolds(0)) {
+        if (fieldFitsInline(PANEL_SLACK)) setPanelMode(false);
+      } else if (!fieldFitsInline(0)) {
         setPanelMode(true);
       }
     }
@@ -578,10 +552,22 @@
     }
 
     function measureNav() {
-      /* Below the breakpoint the CSS is already collapsed and the class would
-         be redundant — worse, the nav is `position: fixed` there and reports a
-         viewport-wide box, which would poison the cached natural width. */
-      if (widthRuleOwns()) { hdr.classList.remove('nav-collapsed'); return; }
+      /* Below the breakpoint the CSS has already collapsed the bar, so the
+         class adds nothing visually — but it is *set* rather than removed, and
+         that matters at the boundary.
+
+         Removing it left the class off across the whole range the CSS owns, so
+         widening past 1040px meant the media query stopped hiding the nav one
+         frame before the script decided to hide it again: a painted frame of
+         the full menu at a width too narrow to hold it, every single crossing.
+         That is the flash. Carrying the class through the CSS range means the
+         crossing needs no new decision — the bar is already collapsed and stays
+         collapsed until it genuinely fits.
+
+         The return still matters for the other reason: below the breakpoint the
+         nav is `position: fixed` and reports a viewport-wide box, so measuring
+         it here would poison the cached natural width. */
+      if (widthRuleOwns()) { hdr.classList.add('nav-collapsed'); return; }
 
       if (!hdr.classList.contains('nav-collapsed')) {
         /* Inline: the links are laid out, so this is the one chance to learn
@@ -592,7 +578,7 @@
            corrected by the next. */
         var navNow = Math.round(navEl.getBoundingClientRect().width);
         if (navNow > 0) navWidth = navNow;
-        if (!fits(MIN_GAP)) {
+        if (!menuFits(0)) {
           hdr.classList.add('nav-collapsed');
           collapsedAtRail = railWidth();
         }
@@ -606,16 +592,15 @@
          both directions from one number makes the header flap at the width
          where collapsing is what creates the room to expand. */
       if (!navWidth) return;
-      /* transitionend on the field's width re-runs this the moment the row has
-         settled, so nothing is lost by waiting. */
-      if (fieldSettling()) return;
       /* HYSTERESIS guards against flapping while the window is being resized, so
          it is charged only when the rail has actually changed width since the
          collapse. At the same width the collapse was caused by something else —
-         an open search field, which stands the links down deliberately — and
-         MIN_GAP alone decides when they come back. */
+         a text zoom, and the clearance alone decides when they come back. The
+         open search field is no longer one of those reasons: menuFits() is
+         computed from the closed row, so opening the field cannot collapse
+         anything. */
       var railUnchanged = Math.abs(railWidth() - collapsedAtRail) < 1;
-      if (fits(railUnchanged ? MIN_GAP : MIN_GAP + HYSTERESIS)) {
+      if (menuFits(railUnchanged ? 0 : HYSTERESIS)) {
         hdr.classList.remove('nav-collapsed');
         /* An open panel must not survive into the inline layout, where nothing
            would ever close it again. */
@@ -627,10 +612,25 @@
     function schedule() {
       if (busy) return;
       busy = true;
-      /* setTimeout, not requestAnimationFrame: rAF is paused in a background
-         tab, so a window resized while the tab was hidden would still be
-         showing the old decision when the reader came back to it. */
-      setTimeout(function () { busy = false; measure(); }, 0);
+      var run = function () { busy = false; measure(); };
+      /* requestAnimationFrame while the page is on screen, because its callback
+         runs before that frame is painted — so the decision lands in the same
+         frame as the resize that prompted it.
+
+         A setTimeout(0) does not: it runs after the frame has been painted, so
+         dragging a window across the threshold showed one frame of the full
+         menu at a width too small to hold it, and then the hamburger. That is
+         the flash, and it is a whole frame wide.
+
+         The timer is still the fallback, for the reason it was chosen
+         originally: rAF is paused in a background tab, and a window resized
+         while the tab was hidden must not come back showing the old decision.
+         Nothing is on screen to flash there. */
+      if (document.visibilityState === 'visible' && window.requestAnimationFrame) {
+        window.requestAnimationFrame(run);
+      } else {
+        setTimeout(run, 0);
+      }
     }
 
     /* The search field changing width is the state this exists for, and
@@ -639,9 +639,11 @@
       var ro = new ResizeObserver(schedule);
       ro.observe(wrap);
       ro.observe(brand);
-      /* `field` is the one declared above; the second `var` here assigns the
-         same element to the same binding. */
-      if (field) ro.observe(field);
+      /* The field is deliberately NOT observed. Its width is a declared
+         constant now (--search-w), so watching it tells the header nothing it
+         does not already know — and watching it meant the whole measurement
+         re-ran on every frame of the open animation, against a row that was
+         mid-reflow. */
     }
     window.addEventListener('resize', schedule);
     /* The search field opening is the case this exists for, and the observer

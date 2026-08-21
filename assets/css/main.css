@@ -333,6 +333,22 @@ hr {
      column-gap from this value, and a variable on a child is not visible to
      its parent. */
   --controls-gap: 0.7rem;
+
+  /* The two numbers that decide the whole bar.
+
+     --search-w is one width, not a range. It was `clamp(8rem, 20vw, 12rem)`
+     with a `min-width` floor and `flex: 0 1 auto`, so the open field rendered
+     anywhere from 96px to 192px depending on the viewport and on how tight the
+     row already was. Every decision about the bar was being taken against that
+     moving number, which is why none of them held still.
+
+     --nav-clearance is the smallest gap allowed between the right edge of the
+     wordmark's blinking cursor and the left edge of HOME. site.js collapses
+     the menu when the row cannot honour it, and drops the search field into
+     its card rather than let the field eat into it. Measured tightest case
+     before this existed: 40px. */
+  --search-w: 12rem;
+  --nav-clearance: 3rem;
   gap: var(--wrap-gap);
   height: var(--bar-h);
 }
@@ -640,7 +656,13 @@ hr {
   .brand { min-width: 0; }
 
   .nav-search { width: auto; margin: 0; min-width: 0; }
-  .nav-controls { min-width: 0; }
+  /* No `min-width: 0` on the control group any more, here or anywhere. It
+     let the group be squeezed below its own contents so the open field could
+     take the room, back when the field shrank to absorb a tight row. It does
+     not shrink now — it is one constant width and falls back to the card — so
+     all this can do is push the theme toggle past the gutter, which it did by
+     7px at 320px the moment the collapsed class started applying here. What
+     gives in a tight row is the wordmark, which has the ellipsis for it. */
 
 
   /* There is a width below which the bar cannot hold the wordmark and a
@@ -714,7 +736,7 @@ hr {
   min-width: 0;
   gap: 0;
 }
-.site-header.search-panel.search-open .nav-controls { min-width: auto; }
+
 
 /* The field. The selector names .nav-search as well, which looks like one
    class too many. It is not: the field's own open-state rules in the component
@@ -958,7 +980,7 @@ html:has(.site-header.search-panel.search-open) body::after {
    baseline because without JS the hamburger cannot open at all. */
 .site-header.nav-collapsed .nav-toggle { order: 2; margin-left: auto; }
 .site-header.nav-collapsed .wrap { --controls-gap: 0.5rem; }
-.site-header.nav-collapsed .nav-controls { order: 3; min-width: 0; }
+.site-header.nav-collapsed .nav-controls { order: 3; }
 .site-header.nav-collapsed .brand { min-width: 0; }
 .site-header.nav-collapsed .nav-search { width: auto; margin: 0; min-width: 0; }
 
@@ -4122,9 +4144,14 @@ body.lb-open { overflow: hidden; }
   align-items: center;
   gap: 0.35rem;
 }
+/* No `position: relative` on the form. The inline field sits in the row, and
+   the card is positioned against the *header* — making the form a positioned
+   ancestor captures the card instead, which put it 290px from the left edge
+   and 56px from the right rather than centred in the gutter. Same trap as the
+   144px panel, same cause. */
 
 .nav-controls { min-width: auto; }
-.site-header.search-open .nav-controls { min-width: 0; }
+
 .nav-search[hidden] { display: none; }
 
 .nav-search.open { flex: 0 1 auto; min-width: 0; }
@@ -4172,6 +4199,13 @@ body.lb-open { overflow: hidden; }
   line-height: 1.9;
   opacity: 0;
   visibility: hidden;
+  /* Width is animated again, and safely this time. It used to be measured
+     while it moved: the ResizeObserver watched this element and the header
+     re-decided its layout on every frame of the animation, and the decision
+     discounted the field's own width, so the row was being planned against a
+     number the animation was still changing. Both are gone — the width is a
+     declared constant and this element is no longer observed — so the
+     transition is now only a transition. */
   transition: width 0.18s ease, opacity 0.18s ease, padding 0.18s ease,
               visibility 0s linear 0.18s;
 }
@@ -4181,19 +4215,24 @@ body.lb-open { overflow: hidden; }
    header control that sometimes refuses to open is not worth the elegance. */
 .nav-search-input.is-open,
 .nav-search.open .nav-search-input {
-  /* Bounded on purpose. A query box wider than the text it holds is just a
-     gap, and letting it fill the header made the whole bar lurch on open.
+  /* One width, no give, and in the row.
 
-     The field may shrink, but `min-width` is load-bearing. With a bare
-     flex-shrink of 1 and no floor, the width below is treated as a starting
-     point and crushed back to zero — the field renders as a 2px sliver of its
-     own border and the form stays the width of the icon. That was the reason
-     this said `flex: 0 0 auto`. The floor gets the same protection without
-     making the field immovable, so it can absorb a tight header instead of
-     passing the squeeze on to the wordmark. */
-  flex: 0 1 auto;
-  width: clamp(8rem, 20vw, 12rem);   /* shorter: it holds a query, not a sentence */
-  min-width: 6rem;                   /* still holds a query; never a sliver */
+     It opens where it sits, so the row grows by --search-w and everything to
+     its left — the menu or the hamburger — shifts to make room. That shift is
+     deliberate. The alternative, opening out of flow into the space that
+     already exists, was tried and cannot work here: all the slack in this bar
+     is between the wordmark and the right-hand group, because .site-nav
+     carries `margin-left: auto` and pushes the nav and the controls right
+     together. A field growing leftward from its icon therefore lands on its
+     neighbour — 35px of hamburger below 1080, 171px of nav links above 1300 —
+     and covering the hamburger makes the menu untappable, which
+     `elementFromPoint` confirmed and two tests caught by timing out on it.
+
+     What does not happen any more is the row running out of space and
+     squeezing: when --search-w plus --nav-clearance will not fit,
+     measureFieldShape() opens the card below the bar instead. */
+  flex: 0 0 auto;
+  width: var(--search-w);
   padding: 0 0.6rem;
   border-width: 1px;
   border-color: var(--border);
@@ -4202,6 +4241,14 @@ body.lb-open { overflow: hidden; }
   transition-delay: 0s;
 }
 .nav-search-input:focus { outline: none; border-color: var(--accent); }
+/* And again, one class deeper, or the inline field never shows focus at all.
+   The open-state rule above sets border-color at two and three classes, which
+   beats a bare `:focus` at one class and a pseudo — so the inline field sat on
+   --border whether it had the caret in it or not, while the card (which has
+   its own four-class focus rule) turned accent correctly. Measured: focused
+   and blurred were the same colour inline, different in the card. */
+.nav-search-input.is-open:focus,
+.nav-search.open .nav-search-input:focus { border-color: var(--accent); }
 
 /* iOS Safari zooms the whole page in when a form control it is focusing has
    text smaller than 16px; at 16px it focuses in place and raises the keyboard.
@@ -4215,13 +4262,8 @@ body.lb-open { overflow: hidden; }
 @media (pointer: coarse) {
   .nav-search-input { font-size: 16px; }
   /* 16px text needs more room than 13px did before it reads as a query box
-     rather than a slot. Both floors move together — the min is what the field
-     falls back to in a tight row. */
-  .nav-search-input.is-open,
-  .nav-search.open .nav-search-input {
-    width: clamp(9rem, 34vw, 14rem);
-    min-width: 7rem;
-  }
+     rather than a slot. One constant here too, for the same reason as above. */
+  .site-header .wrap { --search-w: 14rem; }
 }
 /* Safari draws its own clear button; it fights the border radius. */
 .nav-search-input::-webkit-search-decoration,
