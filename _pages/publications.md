@@ -62,6 +62,6 @@ description: Papers, talks and articles by George Karchemsky.
       {%- endfor %}
     </ul>
   {%- else -%}
-    <p class="empty">Nothing here yet &mdash; the first one is in progress.</p>
+    <p class="empty">No publications yet &mdash; the first one is in progress.</p>
   {%- endif -%}
 </div>
