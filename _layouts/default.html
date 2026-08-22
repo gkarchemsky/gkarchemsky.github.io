@@ -38,10 +38,27 @@
   {%- else -%}
   <title>{{ page.title | default: site.title }} | {{ site.title }}</title>
   {%- endif -%}
-  <link rel="icon" href="{{ '/assets/img/favicon.svg' | relative_url }}" type="image/svg+xml">
+  {%- comment -%}
+    The tab icon is the avatar, uncropped, with the same 20% corner radius the
+    drawn icon used (rx="13" on a 64 viewBox) so the silhouette in the tab strip
+    does not change.
+
+    PNG rather than SVG: the artwork is a photograph, so there is nothing to
+    scale and nothing to adapt to a colour scheme. That also removes the
+    mask-icon, which Safari uses for pinned tabs and which has to be a
+    monochrome mask — a photo cannot be one, and pointing it at a photo would
+    render as a silhouette.
+
+    Sizes are explicit so browsers pick rather than resample: 16 and 32 for tab
+    strips, 48 inside favicon.ico for legacy clients, 180 for the iOS home
+    screen. All are generated from assets/img/avatar-90.jpg, which is 90x90 —
+    so 180 is upscaled and will look soft. Replace the source with a
+    higher-resolution original of the same photo and regenerate to fix that.
+  {%- endcomment -%}
+  <link rel="icon" href="{{ '/assets/img/favicon-32.png' | relative_url }}" type="image/png" sizes="32x32">
+  <link rel="icon" href="{{ '/assets/img/favicon-16.png' | relative_url }}" type="image/png" sizes="16x16">
   <link rel="icon" href="{{ '/favicon.ico' | relative_url }}" sizes="any">
   <link rel="apple-touch-icon" href="{{ '/assets/img/apple-touch-icon.png' | relative_url }}">
-  <link rel="mask-icon" href="{{ '/assets/img/favicon.svg' | relative_url }}" color="#0a9ecf">
 
   <link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}?v={{ v }}">
   {%- feed_meta -%}
